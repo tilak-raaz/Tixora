@@ -41,12 +41,45 @@ Razorpay ──webhooks──┘                      ▼
 Routes parse and validate input, services hold business rules and own transactions, repos hold
 SQL. Tests call services directly against a real database for concurrency work.
 
+## Data model
+
+Catalog and identity as of M1. Seat ownership lives only in `show_seats`; bookings (M2) change
+it with a conditional `UPDATE` on those rows.
+
+```mermaid
+erDiagram
+    cities ||--o{ theatres : has
+    theatres ||--o{ screens : has
+    screens ||--o{ seats : has
+    seat_categories ||--o{ seats : prices
+    movies ||--o{ shows : plays
+    screens ||--o{ shows : hosts
+    shows ||--o{ show_prices : "price per category"
+    seat_categories ||--o{ show_prices : ""
+    shows ||--o{ show_seats : "inventory"
+    seats ||--o{ show_seats : ""
+    users ||--o{ sessions : has
+    users ||--o{ accounts : "signs in with"
+```
+
+| Rule                                                        | Enforced by                                                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Two scheduled shows never overlap on one screen             | `shows_no_overlap` exclusion constraint                                    |
+| One seat per row and number, and per grid cell, on a screen | `seats_screen_row_number_key`, `seats_screen_grid_key`                     |
+| One inventory row per seat per show                         | `show_seats_show_seat_key`                                                 |
+| A held seat always has an expiry, and only a held seat      | `show_seats_hold_consistency`                                              |
+| Money is positive whole paise                               | `CHECK (price_paise > 0)` ([ADR 0003](adr/0003-money-as-integer-paise.md)) |
+| One account per email, ignoring case                        | `users_email_lower_key`                                                    |
+
+Times are stored as `timestamptz` in UTC. Each city has a `timezone` (default `Asia/Kolkata`)
+that decides which shows fall on a given calendar date there.
+
 ## Status by milestone
 
 | Area                          | Milestone | State       |
 | ----------------------------- | --------- | ----------- |
-| Foundations                   | M0        | In progress |
-| Accounts and catalog          | M1        | Planned     |
+| Foundations                   | M0        | Done        |
+| Accounts and catalog          | M1        | In progress |
 | Seat holds                    | M2        | Planned     |
 | Payments                      | M3        | Planned     |
 | Outbox and queues             | M4        | Planned     |

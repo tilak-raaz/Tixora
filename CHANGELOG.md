@@ -13,6 +13,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `GET /api/v1/me`; `requireAuth` and `requireRole` middleware; `user` and `admin` roles
 - `make create-admin`: creates or promotes the admin from `ADMIN_*` in `.env`
 - Integration test that fails if the migration drifts from Better Auth's expected schema
+- `0003_catalog.sql`: cities, theatres, screens, seat categories, seats, movies, shows, show prices and per-show seat inventory
+- Database rules for the catalog, each with a test: no overlapping shows on a screen, unique seats per screen, hold/expiry consistency, positive paise prices
+- Data model section with an ER diagram in `docs/architecture.md`
 
 ## [0.1.0] - 2026-10-14
 
