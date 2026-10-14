@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Accounts with Better Auth (ADR 0004): email + password sign-up, sign-in and sign-out under `/api/auth`
+- Sessions in Redis shared by every API replica, also written to Postgres
+- `0002_identity.sql`: `users`, `sessions`, `accounts`, and a shared `set_updated_at()` trigger
+- `GET /api/v1/me`; `requireAuth` and `requireRole` middleware; `user` and `admin` roles
+- `make create-admin`: creates or promotes the admin from `ADMIN_*` in `.env`
+- Integration test that fails if the migration drifts from Better Auth's expected schema
+
 ## [0.1.0] - 2026-10-14
 
 M0: foundations.

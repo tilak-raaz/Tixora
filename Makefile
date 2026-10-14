@@ -1,7 +1,7 @@
 COMPOSE = docker compose -f infra/docker-compose.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate dev-api dev-worker test test-unit test-integration lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin dev-api dev-worker test test-unit test-integration lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -29,6 +29,9 @@ redis-cli: ## Open redis-cli against the local Redis
 
 migrate: ## Apply pending database migrations
 	npm run migrate
+
+create-admin: ## Create or promote the admin account from ADMIN_* in .env
+	npm run create-admin
 
 dev-api: ## Run the API with reload
 	npm run dev:api
