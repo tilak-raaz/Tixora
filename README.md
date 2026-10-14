@@ -4,20 +4,22 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M0 (foundations).** Only what is listed under "What works today" is built. Everything
+> **Status: M1 in progress (accounts and catalog).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
 ## What works today
 
 - API and worker processes with validated configuration, structured logs and graceful shutdown
+- Accounts with Better Auth: email + password sign-up and sign-in, sessions shared across
+  replicas through Redis (and kept in Postgres), `user` and `admin` roles
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, plus integration tests against real Postgres and Redis containers
 
 ## Stack
 
-TypeScript (strict) on Node.js 24 · Express 5 · PostgreSQL 17 with raw SQL via `pg` · Redis 7 ·
+TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 ·
 Zod · pino · Vitest + Testcontainers · Docker Compose · GitHub Actions
 
 ## Quickstart
@@ -29,6 +31,7 @@ cp .env.example .env
 npm install
 make up          # Postgres, Redis, Mailpit
 make migrate
+make create-admin  # admin account from ADMIN_* in .env
 make dev-api     # http://localhost:4000/readyz
 make test        # unit + integration (starts its own containers)
 ```

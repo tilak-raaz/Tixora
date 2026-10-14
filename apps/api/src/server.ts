@@ -6,7 +6,8 @@ import {
   loadEnvFile,
 } from '@bmt/platform';
 import { createApp } from './app';
-import { loadConfig } from './config';
+import { authConfigFrom, loadConfig } from './config';
+import { createAuth } from './modules/auth/auth';
 import { ENV_FILE } from './paths';
 
 loadEnvFile(ENV_FILE);
@@ -25,8 +26,9 @@ const pool = createPool({
   logger,
 });
 const redis = createRedis(config.REDIS_URL, logger);
+const auth = createAuth({ pool, redis, logger, config: authConfigFrom(config) });
 
-const app = createApp({ logger, pool, redis });
+const app = createApp({ logger, pool, redis, auth });
 
 const server = app.listen(config.PORT, (err?: Error) => {
   if (err) {

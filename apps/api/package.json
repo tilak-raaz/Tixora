@@ -7,14 +7,17 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
+    "create-admin": "tsx src/scripts/create-admin.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration"
   },
   "dependencies": {
+    "@better-auth/redis-storage": "1.7.8",
     "@bmt/platform": "*",
     "@bmt/shared": "*",
+    "better-auth": "1.7.8",
     "express": "^5.1.0",
     "ioredis": "^5.4.1",
     "pg": "^8.16.0",

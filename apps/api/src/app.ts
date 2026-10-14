@@ -1,14 +1,18 @@
 import type { Logger, Pool, Redis } from '@bmt/platform';
+import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
 import { errorHandler } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
 import { requestLogger } from './middleware/request-logger';
+import type { Auth } from './modules/auth/auth';
+import { authRouter } from './modules/auth/routes';
 import { healthRouter } from './routes/health';
 
 export interface AppDeps {
   logger: Logger;
   pool: Pool;
   redis: Redis;
+  auth: Auth;
 }
 
 /**
@@ -23,13 +27,18 @@ export function createApp(deps: AppDeps): Express {
   app.set('trust proxy', 1);
 
   app.use(requestLogger(deps.logger));
+
+  // Better Auth's endpoints (sign-up, sign-in, sign-out, get-session).
+  // Mounted before express.json() because Better Auth reads the raw body itself.
+  app.all('/api/auth/*splat', toNodeHandler(deps.auth));
+
   app.use(express.json({ limit: '100kb' }));
 
   // Ops endpoints live at the root, outside the versioned API.
   app.use(healthRouter(deps));
 
   const v1 = Router();
-  // Feature modules mount here from M1: v1.use('/auth', authRouter(deps)), ...
+  v1.use(authRouter(deps));
   app.use('/api/v1', v1);
 
   app.use(notFoundHandler);

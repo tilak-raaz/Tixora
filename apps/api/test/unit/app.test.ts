@@ -1,7 +1,21 @@
 import { createLogger, type Pool, type Redis } from '@bmt/platform';
+import { Redis as IORedis } from 'ioredis';
+import pg from 'pg';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
+import { createAuth } from '../../src/modules/auth/auth';
+
+// Better Auth gets clients pointing nowhere: nothing in these tests reaches
+// /api/auth or /api/v1/me. Its start-up schema check fails quietly into the
+// silent logger.
+const silent = createLogger({ name: 'test', level: 'silent' });
+const auth = createAuth({
+  logger: silent,
+  pool: new pg.Pool({ connectionString: 'postgres://unused@127.0.0.1:1/unused' }),
+  redis: new IORedis({ lazyConnect: true }),
+  config: { secret: 'a'.repeat(32), baseURL: 'http://localhost:4000', trustedOrigins: [] },
+});
 
 // Unit tests drive the real Express app with fake dependencies: no containers needed.
 function appWith(overrides: { dbUp?: boolean; redisUp?: boolean } = {}) {
@@ -18,7 +32,7 @@ function appWith(overrides: { dbUp?: boolean; redisUp?: boolean } = {}) {
       return 'PONG';
     },
   } as unknown as Redis;
-  return createApp({ logger: createLogger({ name: 'test', level: 'silent' }), pool, redis });
+  return createApp({ logger: silent, pool, redis, auth });
 }
 
 describe('error handling', () => {

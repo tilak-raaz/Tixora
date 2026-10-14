@@ -13,6 +13,7 @@ cp .env.example .env
 npm install          # also installs the git hooks (needs `git init` first)
 make up              # Postgres :5432, Redis :6379, Mailpit UI :8025
 make migrate
+make create-admin     # admin account from ADMIN_* in .env
 make dev-api         # in one terminal
 make dev-worker      # in another
 curl localhost:4000/readyz
@@ -28,6 +29,18 @@ curl localhost:4000/readyz
 | `make redis-cli`        | redis-cli on the local Redis                |
 | `make test`             | Unit + integration tests                    |
 | `make check`            | Lint, typecheck and all tests, like CI      |
+
+## Trying auth by hand
+
+```bash
+# sign up (the Origin header is required, as a browser would send it)
+curl -i -c cookies.txt -H 'origin: http://localhost:3000' -H 'content-type: application/json' \
+  -d '{"name":"Asha","email":"asha@example.com","password":"correct-horse-battery"}' \
+  localhost:4000/api/auth/sign-up/email
+
+# who am I?
+curl -b cookies.txt localhost:4000/api/v1/me
+```
 
 ## Adding a migration
 
