@@ -1,0 +1,16 @@
+{
+  "name": "@bmt/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Types, schemas and constants shared by the API, worker and web app (no Node-only code)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

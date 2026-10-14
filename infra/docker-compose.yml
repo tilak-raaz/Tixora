@@ -1,0 +1,45 @@
+# Local infrastructure for development.
+# The app itself runs on the host (npm run dev:api / dev:worker) against these containers.
+# The `full` profile (3 API replicas, worker, nginx) is added in M7 for load testing.
+name: bmt
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bmt
+      POSTGRES_PASSWORD: bmt
+      POSTGRES_DB: bmt
+    ports:
+      - '5432:5432'
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bmt -d bmt']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Catches every email the app sends. Inbox UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '8025:8025' # web UI
+      - '1025:1025' # SMTP
+
+volumes:
+  pg_data:
+  redis_data:
