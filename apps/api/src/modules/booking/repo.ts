@@ -16,7 +16,7 @@ export async function findShowForHold(
 /**
  * Expires this user's own pending booking for the show if its hold has run out,
  * and frees its seats, so an old hold never blocks a new one. (The sweeper in
- * the next PR does the same for everyone in the background.)
+ * the worker does the same for everyone in the background, see @bmt/jobs.)
  */
 export async function expireStaleHold(db: Db, userId: string, showId: string): Promise<void> {
   await db.query(

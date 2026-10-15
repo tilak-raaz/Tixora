@@ -1,3 +1,4 @@
+import type { HoldExpiryScheduler } from '@bmt/jobs';
 import { withTransaction, type Pool } from '@bmt/platform';
 import { AppError, NotFoundError } from '../../lib/errors';
 import { isPgError, PG_UNIQUE_VIOLATION } from '../../lib/pg-errors';
@@ -25,14 +26,20 @@ export type BookingService = ReturnType<typeof createBookingService>;
 /**
  * `strategy` defaults to plain `conditional`, which needs no Redis client
  * (handy in tests); the app passes the configured one (`redis` by default).
+ * `expiry` queues the job that releases a hold when it runs out; without it
+ * (tests, the benchmark) the worker's sweeper still releases it.
  */
 export function createBookingService(
   pool: Pool,
   config: BookingConfig = DEFAULT_BOOKING_CONFIG,
   strategy: SeatHoldStrategy = conditionalStrategy,
+  expiry?: HoldExpiryScheduler,
 ) {
   /** The hold transaction: everything except the optional pre-lock. */
-  async function holdInDatabase(userId: string, input: HoldInput): Promise<string> {
+  async function holdInDatabase(
+    userId: string,
+    input: HoldInput,
+  ): Promise<{ id: string; expiresAt: Date }> {
     return withTransaction(pool, async (tx) => {
       const show = await repo.findShowForHold(tx, input.showId);
       if (!show) throw new NotFoundError('Show not found');
@@ -81,7 +88,7 @@ export function createBookingService(
       }
 
       await repo.insertBookingSeats(tx, booking.id, seats);
-      return booking.id;
+      return booking;
     });
   }
 
@@ -94,7 +101,7 @@ export function createBookingService(
      * (seat taken, second pending booking) leaves no trace.
      */
     async hold(userId: string, input: HoldInput): Promise<repo.BookingView> {
-      let bookingId: string;
+      let booking: { id: string; expiresAt: Date };
       if (strategy.preLock) {
         const lock = await strategy.preLock({ showId: input.showId, showSeatIds: input.seatIds });
         if (!lock.ok) {
@@ -104,14 +111,16 @@ export function createBookingService(
           );
         }
         try {
-          bookingId = await holdInDatabase(userId, input);
+          booking = await holdInDatabase(userId, input);
         } finally {
           await lock.release();
         }
       } else {
-        bookingId = await holdInDatabase(userId, input);
+        booking = await holdInDatabase(userId, input);
       }
-      return (await repo.findBookingView(pool, bookingId, userId))!;
+      // Only after the commit: a job for a hold that rolled back would be noise.
+      await expiry?.schedule(booking.id, booking.expiresAt);
+      return (await repo.findBookingView(pool, booking.id, userId))!;
     },
 
     async get(userId: string, bookingId: string): Promise<repo.BookingView> {
