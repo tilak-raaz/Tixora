@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- `0004_bookings.sql`: `bookings`, `booking_seats` and `idempotency_keys`; `show_seats.booking_id` records which booking holds or owns a seat
+- Database rules, each with a test: a held seat has a booking and an expiry, a booked seat has a booking, a free seat has neither; one pending booking per user per show
+
 ## [0.2.0] - 2026-10-15
 
 M1: accounts and catalog.

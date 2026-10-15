@@ -373,11 +373,12 @@ describe('show prices and show seats', () => {
 
   it('rejects an unknown seat status', async () => {
     const { showId, seatId } = await showWithSeat();
+    // Both show_seats_status_valid and show_seats_hold_consistency reject this row;
+    // Postgres reports whichever it checks first, so assert only that a CHECK fails.
     await expectViolation(
       "INSERT INTO show_seats (show_id, seat_id, price_paise, status) VALUES ($1, $2, 22000, 'RESERVED')",
       [showId, seatId],
       CHECK,
-      'show_seats_status_valid',
     );
   });
 

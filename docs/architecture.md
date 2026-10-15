@@ -43,7 +43,7 @@ SQL. Tests call services directly against a real database for concurrency work.
 
 ## Data model
 
-Catalog and identity as of M1. Seat ownership lives only in `show_seats`; bookings (M2) change
+Identity, catalog and bookings as of M2. Seat ownership lives only in `show_seats`; bookings (M2) change
 it with a conditional `UPDATE` on those rows.
 
 ```mermaid
@@ -59,17 +59,23 @@ erDiagram
     shows ||--o{ show_seats : "inventory"
     seats ||--o{ show_seats : ""
     users ||--o{ sessions : has
+    users ||--o{ bookings : makes
+    shows ||--o{ bookings : for
+    bookings ||--o{ booking_seats : covers
+    show_seats ||--o{ booking_seats : ""
+    bookings |o--o{ show_seats : "holds or owns"
     users ||--o{ accounts : "signs in with"
 ```
 
-| Rule                                                        | Enforced by                                                                |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Two scheduled shows never overlap on one screen             | `shows_no_overlap` exclusion constraint                                    |
-| One seat per row and number, and per grid cell, on a screen | `seats_screen_row_number_key`, `seats_screen_grid_key`                     |
-| One inventory row per seat per show                         | `show_seats_show_seat_key`                                                 |
-| A held seat always has an expiry, and only a held seat      | `show_seats_hold_consistency`                                              |
-| Money is positive whole paise                               | `CHECK (price_paise > 0)` ([ADR 0003](adr/0003-money-as-integer-paise.md)) |
-| One account per email, ignoring case                        | `users_email_lower_key`                                                    |
+| Rule                                                                                | Enforced by                                                                |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Two scheduled shows never overlap on one screen                                     | `shows_no_overlap` exclusion constraint                                    |
+| One seat per row and number, and per grid cell, on a screen                         | `seats_screen_row_number_key`, `seats_screen_grid_key`                     |
+| One inventory row per seat per show                                                 | `show_seats_show_seat_key`                                                 |
+| Held seats have a booking and an expiry; booked seats a booking; free seats neither | `show_seats_hold_consistency`                                              |
+| At most one pending booking per user per show                                       | `bookings_one_pending_per_user_show`                                       |
+| Money is positive whole paise                                                       | `CHECK (price_paise > 0)` ([ADR 0003](adr/0003-money-as-integer-paise.md)) |
+| One account per email, ignoring case                                                | `users_email_lower_key`                                                    |
 
 Times are stored as `timestamptz` in UTC. Each city has a `timezone` (default `Asia/Kolkata`)
 that decides which shows fall on a given calendar date there.
