@@ -12,6 +12,7 @@ export default {
         'web',
         'shared',
         'platform',
+        'jobs',
         'db',
         'infra',
         'ci',
