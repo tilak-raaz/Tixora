@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
+M2: seat holds and concurrency.
+
 ### Added
 
 - `0004_bookings.sql`: `bookings`, `booking_seats` and `idempotency_keys`; `show_seats.booking_id` records which booking holds or owns a seat
@@ -64,6 +68,7 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tilak-raaz/Tixora/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tilak-raaz/Tixora/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tilak-raaz/Tixora/releases/tag/v0.1.0
