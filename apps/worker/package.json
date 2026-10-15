@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@bmt/jobs": "*",
     "@bmt/platform": "*",
     "zod": "^4.1.0"
   }

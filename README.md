@@ -18,13 +18,15 @@ async processing and distributed rate limiting.
 - Seat holds: up to 5 seats for 5 minutes, all or nothing, safe under contention across replicas
   (200 simultaneous buyers for one seat produce exactly one winner, proven by test), with
   idempotent retries
+- Hold expiry: a delayed job per hold releases its seats when the hold runs out, and a sweeper in
+  every worker catches any job that was lost, so a crash or a Redis outage never strands seats
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, plus integration tests against real Postgres and Redis containers
 
 ## Stack
 
-TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 ·
+TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ ·
 Zod · pino · Vitest + Testcontainers · Docker Compose · GitHub Actions
 
 ## Quickstart
@@ -39,6 +41,7 @@ make migrate
 make create-admin  # admin account from ADMIN_* in .env
 make seed          # demo city, theatres, movies and a week of shows
 make dev-api     # http://localhost:4000/readyz
+make dev-worker  # hold expiry (second terminal)
 make test        # unit + integration (starts its own containers)
 ```
 
@@ -49,6 +52,7 @@ make test        # unit + integration (starts its own containers)
 ```text
 apps/api          Express API (modules mount under /api/v1)
 apps/worker       Background jobs: outbox relay, email, hold expiry, reconciliation
+packages/jobs     Background jobs (BullMQ queues and their SQL), shared by API and worker
 packages/platform Server-side building blocks: env, logger, Postgres, Redis, migrations
 packages/shared   Types and constants shared with the frontend
 db/migrations     Forward-only SQL migrations (NNNN_name.sql)

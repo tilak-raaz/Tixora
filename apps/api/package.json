@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@better-auth/redis-storage": "1.7.8",
+    "@bmt/jobs": "*",
     "@bmt/platform": "*",
     "@bmt/shared": "*",
     "better-auth": "1.7.8",
