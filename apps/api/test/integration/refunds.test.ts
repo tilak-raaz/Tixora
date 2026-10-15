@@ -71,7 +71,10 @@ async function latePayment(
   );
   expect(res.status).toBe(200);
   const [refund] = await refundsOf(deps.pool, c.bookingId);
-  expect(refund).toMatchObject({ status: 'PENDING', reason: 'HOLD_ENDED' });
+  expect(refund).toMatchObject({ reason: 'HOLD_ENDED' });
+  // With a refund worker running (the end-to-end test) the refund may already
+  // be sent by now; without one it must still be waiting.
+  if (onApp === app) expect(refund!.status).toBe('PENDING');
   return { ...c, refundId: refund!.id, paymentId: paid.id };
 }
 
