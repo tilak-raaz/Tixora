@@ -1,4 +1,3 @@
-import { createHoldExpiryQueue, createHoldExpiryScheduler } from '@bmt/jobs';
 import {
   createLogger,
   createPool,
@@ -29,17 +28,7 @@ const pool = createPool({
 const redis = createRedis(config.REDIS_URL, logger);
 const auth = createAuth({ pool, redis, logger, config: authConfigFrom(config) });
 
-const holdExpiryQueue = createHoldExpiryQueue(config.REDIS_URL);
-holdExpiryQueue.on('error', (err) => logger.error({ err }, 'hold expiry queue error'));
-
-const app = createApp({
-  logger,
-  pool,
-  redis,
-  auth,
-  booking: bookingConfigFrom(config),
-  holdExpiry: createHoldExpiryScheduler(holdExpiryQueue, logger),
-});
+const app = createApp({ logger, pool, redis, auth, booking: bookingConfigFrom(config) });
 
 const server = app.listen(config.PORT, (err?: Error) => {
   if (err) {
@@ -58,6 +47,6 @@ installProcessHandlers({
       server.close((err) => (err ? reject(err) : resolve()));
     });
     // 2. Only then close the connections those requests were using.
-    await Promise.all([pool.end(), redis.quit(), holdExpiryQueue.close()]);
+    await Promise.all([pool.end(), redis.quit()]);
   },
 });

@@ -1,4 +1,3 @@
-import type { HoldExpiryScheduler } from '@bmt/jobs';
 import type { Logger, Pool, Redis } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
@@ -19,8 +18,6 @@ export interface AppDeps {
   auth: Auth;
   /** Hold length and seat limit; defaults to 5 minutes and 5 seats. */
   booking?: BookingConfig;
-  /** Queues each hold's expiry job; without it the worker's sweeper still releases holds. */
-  holdExpiry?: HoldExpiryScheduler;
 }
 
 /**

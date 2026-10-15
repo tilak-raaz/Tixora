@@ -34,7 +34,6 @@ Razorpay ──webhooks──┘                      ▼
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | `apps/api`          | HTTP layer. Each module in `src/modules/<name>/` has `routes`, `service`, `repo`, `schemas`  |
 | `apps/worker`       | Queue consumers, outbox relay, hold-expiry sweeper, payment reconciler                       |
-| `packages/jobs`     | Queue names, job payloads and their SQL, shared by the API (producer) and worker (consumer)  |
 | `packages/platform` | Server-only building blocks: env parsing, logger, Postgres pool, Redis, migrations, shutdown |
 | `packages/shared`   | Types, schemas and constants safe to use in the browser                                      |
 | `db/migrations`     | Forward-only SQL, applied by `packages/platform/src/migrate.ts`                              |
@@ -81,27 +80,13 @@ erDiagram
 Times are stored as `timestamptz` in UTC. Each city has a `timezone` (default `Asia/Kolkata`)
 that decides which shows fall on a given calendar date there.
 
-## Life of a hold
-
-```text
-POST /bookings ──▶ [Redis pre-lock] ──▶ hold transaction (Postgres) ──commit──▶ queue hold-expiry job
-                                                                                  (delay = expires_at + 1 s)
-worker: job fires ─────────────┐
-worker: sweeper every 30 s ────┴─▶ UPDATE ... WHERE status = 'PENDING_PAYMENT' AND expires_at <= now()
-                                   booking EXPIRED, seats still pointing at it AVAILABLE
-```
-
-A seat whose hold has run out is free to the next buyer straight away; the job and the sweeper
-only make the stored state catch up ([ADR 0005](adr/0005-seat-hold-strategy.md),
-[ADR 0006](adr/0006-hold-expiry.md)).
-
 ## Status by milestone
 
 | Area                          | Milestone | State   |
 | ----------------------------- | --------- | ------- |
 | Foundations                   | M0        | Done    |
 | Accounts and catalog          | M1        | Done    |
-| Seat holds                    | M2        | Done    |
+| Seat holds                    | M2        | Planned |
 | Payments                      | M3        | Planned |
 | Outbox and queues             | M4        | Planned |
 | Rate limiting and caching     | M5        | Planned |
