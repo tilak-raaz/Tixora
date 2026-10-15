@@ -129,7 +129,7 @@ See [ADR 0007](adr/0007-payment-confirmation.md).
 | Foundations                   | M0        | Done    |
 | Accounts and catalog          | M1        | Done    |
 | Seat holds                    | M2        | Done    |
-| Payments                      | M3        | Planned |
+| Payments                      | M3        | Done    |
 | Outbox and queues             | M4        | Planned |
 | Rate limiting and caching     | M5        | Planned |
 | Frontend                      | M6        | Planned |
