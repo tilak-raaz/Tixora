@@ -1,7 +1,9 @@
 import type { HoldExpiryScheduler } from '@bmt/jobs';
+import type { PaymentGateway } from '@bmt/payments';
 import type { Logger, Pool, Redis } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
+import { devRouter } from './dev/routes';
 import { errorHandler } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
 import { requestLogger } from './middleware/request-logger';
@@ -10,6 +12,8 @@ import { authRouter } from './modules/auth/routes';
 import { bookingRouter } from './modules/booking/routes';
 import type { BookingConfig } from './modules/booking/service';
 import { adminCatalogRouter, catalogRouter } from './modules/catalog/routes';
+import { paymentRouter } from './modules/payment/routes';
+import type { PaymentConfig } from './modules/payment/service';
 import { healthRouter } from './routes/health';
 
 export interface AppDeps {
@@ -21,6 +25,11 @@ export interface AppDeps {
   booking?: BookingConfig;
   /** Queues each hold's expiry job; without it the worker's sweeper still releases holds. */
   holdExpiry?: HoldExpiryScheduler;
+  /** Razorpay (or the fake in tests); without it the payment endpoints answer 503. */
+  paymentGateway?: PaymentGateway;
+  payment?: PaymentConfig;
+  /** Serves /dev/checkout. Development only. */
+  devPages?: boolean;
 }
 
 /**
@@ -49,8 +58,10 @@ export function createApp(deps: AppDeps): Express {
   v1.use(authRouter(deps));
   v1.use(catalogRouter(deps));
   v1.use(bookingRouter(deps));
+  v1.use(paymentRouter(deps));
   v1.use('/admin', adminCatalogRouter(deps));
   app.use('/api/v1', v1);
+  if (deps.devPages) app.use(devRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

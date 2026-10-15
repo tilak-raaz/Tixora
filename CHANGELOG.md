@@ -8,6 +8,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 ### Added
 
 - `0005_payments.sql`: `payment_orders`, `payments`, `refunds` and `payment_webhook_events`
+- `POST /api/v1/bookings/:id/payment-order`: creates the booking's Razorpay order once (201) and returns the same order afterwards (200); refuses a hold that has ended (409 `HOLD_NOT_ACTIVE`) or has under a minute left (409 `HOLD_ENDING_SOON`); 502 `PAYMENT_GATEWAY_ERROR` when Razorpay is down, with nothing stored
+- Order creation survives crashes and races: the booking id is the Razorpay receipt, so a retry finds an order an earlier attempt created but never stored; the one-order-per-booking rule settles concurrent requests; no transaction is open while Razorpay is called
+- `POST /api/v1/bookings/:id/payment/verify`: checks Checkout's signature (constant-time HMAC); it never confirms the booking, the webhook does
+- `packages/payments` (`@bmt/payments`): a Razorpay client over `fetch`, an in-memory fake with the same interface for tests, and checkout and webhook signature checks
+- `/dev/checkout` (development only) and [docs/runbooks/payments-local.md](docs/runbooks/payments-local.md) for paying in Razorpay test mode by hand
+- Settings `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`; without keys the API runs and payment endpoints answer 503
 - Money rules in the database, each with a test: an order is for exactly its booking's total (a composite foreign key, which also freezes the total); at most one payment confirms a booking; a refund is for the full payment and happens at most once; every Razorpay id is recorded once
 
 ## [0.3.0] - 2026-10-15

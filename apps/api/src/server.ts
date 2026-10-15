@@ -1,4 +1,5 @@
 import { createHoldExpiryQueue, createHoldExpiryScheduler } from '@bmt/jobs';
+import { createRazorpayGateway } from '@bmt/payments';
 import {
   createLogger,
   createPool,
@@ -7,7 +8,7 @@ import {
   loadEnvFile,
 } from '@bmt/platform';
 import { createApp } from './app';
-import { authConfigFrom, bookingConfigFrom, loadConfig } from './config';
+import { authConfigFrom, bookingConfigFrom, loadConfig, razorpayConfigFrom } from './config';
 import { createAuth } from './modules/auth/auth';
 import { ENV_FILE } from './paths';
 
@@ -29,6 +30,10 @@ const pool = createPool({
 const redis = createRedis(config.REDIS_URL, logger);
 const auth = createAuth({ pool, redis, logger, config: authConfigFrom(config) });
 
+const razorpay = razorpayConfigFrom(config);
+if (!razorpay)
+  logger.warn('RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not set: payment endpoints answer 503');
+
 const holdExpiryQueue = createHoldExpiryQueue(config.REDIS_URL);
 holdExpiryQueue.on('error', (err) => logger.error({ err }, 'hold expiry queue error'));
 
@@ -39,6 +44,8 @@ const app = createApp({
   auth,
   booking: bookingConfigFrom(config),
   holdExpiry: createHoldExpiryScheduler(holdExpiryQueue, logger),
+  paymentGateway: razorpay ? createRazorpayGateway(razorpay) : undefined,
+  devPages: config.NODE_ENV === 'development',
 });
 
 const server = app.listen(config.PORT, (err?: Error) => {

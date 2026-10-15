@@ -45,6 +45,25 @@ describe('loadConfig', () => {
     );
   });
 
+  it('treats empty Razorpay keys as not set', () => {
+    const config = loadConfig({ ...valid, RAZORPAY_KEY_ID: '', RAZORPAY_KEY_SECRET: '' });
+    expect(config.RAZORPAY_KEY_ID).toBeUndefined();
+    expect(config.RAZORPAY_KEY_SECRET).toBeUndefined();
+  });
+
+  it('accepts a Razorpay key pair and refuses half of one', () => {
+    expect(
+      loadConfig({ ...valid, RAZORPAY_KEY_ID: 'rzp_test_abc', RAZORPAY_KEY_SECRET: 'shh' })
+        .RAZORPAY_KEY_ID,
+    ).toBe('rzp_test_abc');
+    expect(() => loadConfig({ ...valid, RAZORPAY_KEY_ID: 'rzp_test_abc' })).toThrow(
+      /RAZORPAY_KEY_SECRET/,
+    );
+    expect(() =>
+      loadConfig({ ...valid, RAZORPAY_KEY_ID: 'abc', RAZORPAY_KEY_SECRET: 'shh' }),
+    ).toThrow(/RAZORPAY_KEY_ID/);
+  });
+
   it('rejects an out-of-range port', () => {
     expect(() => loadConfig({ ...valid, PORT: '70000' })).toThrow(/PORT/);
   });
