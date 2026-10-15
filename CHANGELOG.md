@@ -5,24 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
+M3: payments.
+
 ### Added
 
 - `0005_payments.sql`: `payment_orders`, `payments`, `refunds` and `payment_webhook_events`
-- Refunds reach Razorpay: a BullMQ job per refund, queued after the transaction that records it and retried with backoff; our refund id is the Razorpay receipt, so a retry finds the first refund instead of making a second; a sweeper re-queues refunds still `PENDING`; `refund.processed` and `refund.failed` webhooks settle them, and a settled refund never changes again
-- Reconciler in the worker: asks Razorpay about unconfirmed orders (1 minute to 24 hours old, each at most every 10 minutes, claimed with `SKIP LOCKED` so workers split them) and applies captured payments through the same confirm-or-refund code as the webhook
-- `0006_payment_reconcile.sql`: `payment_orders.checked_at`
-- Worker settings `REFUND_SWEEP_INTERVAL_MS`, `RECONCILE_INTERVAL_MS`; the worker reads the Razorpay keys and runs refunds and the reconciler only when they are set
-- `POST /webhooks/razorpay` (ADR 0007): signature checked on the raw body; each event stored once by `X-Razorpay-Event-Id`, in the same transaction that acts on it, so redeliveries change nothing
-- Confirm transaction: with the booking locked, a captured payment confirms it only while the hold is active and every seat is still held by it; seats become `BOOKED` and the booking `CONFIRMED` in one commit
-- Late, duplicate and wrong-amount payments are recorded and refunded in full (`HOLD_ENDED`, `DUPLICATE_PAYMENT`, `AMOUNT_MISMATCH`), never applied; one payment reported by both `payment.captured` and `order.paid` is applied once
-- Tests for forged, redelivered, reordered, concurrent and late webhooks, each followed by a money-and-seat invariant check
+- Money rules in the database, each with a test: an order is for exactly its booking's total (a composite foreign key, which also freezes the total); at most one payment confirms a booking; a refund is for the full payment and happens at most once; every Razorpay id is recorded once
 - `POST /api/v1/bookings/:id/payment-order`: creates the booking's Razorpay order once (201) and returns the same order afterwards (200); refuses a hold that has ended (409 `HOLD_NOT_ACTIVE`) or has under a minute left (409 `HOLD_ENDING_SOON`); 502 `PAYMENT_GATEWAY_ERROR` when Razorpay is down, with nothing stored
 - Order creation survives crashes and races: the booking id is the Razorpay receipt, so a retry finds an order an earlier attempt created but never stored; the one-order-per-booking rule settles concurrent requests; no transaction is open while Razorpay is called
 - `POST /api/v1/bookings/:id/payment/verify`: checks Checkout's signature (constant-time HMAC); it never confirms the booking, the webhook does
+- `POST /webhooks/razorpay` (ADR 0007): signature checked on the raw body; each event stored once by `X-Razorpay-Event-Id`, in the same transaction that acts on it, so redeliveries change nothing
+- Confirm transaction: with the booking locked, a captured payment confirms it only while the hold is active and every seat is still held by it; seats become `BOOKED` and the booking `CONFIRMED` in one commit
+- Late, duplicate and wrong-amount payments are recorded and refunded in full (`HOLD_ENDED`, `DUPLICATE_PAYMENT`, `AMOUNT_MISMATCH`), never applied; one payment reported by both `payment.captured` and `order.paid` is applied once
+- Refunds reach Razorpay: a BullMQ job per refund, queued after the transaction that records it and retried with backoff; our refund id is the Razorpay receipt, so a retry finds the first refund instead of making a second; a sweeper re-queues refunds still `PENDING`; `refund.processed` and `refund.failed` webhooks settle them, and a settled refund never changes again
+- Reconciler in the worker: asks Razorpay about unconfirmed orders (1 minute to 24 hours old, each at most every 10 minutes, claimed with `SKIP LOCKED` so workers split them) and applies captured payments through the same confirm-or-refund code as the webhook
+- `0006_payment_reconcile.sql`: `payment_orders.checked_at`
+- Tests for forged, redelivered, reordered, concurrent and late webhooks, each followed by a money-and-seat invariant check
 - `packages/payments` (`@bmt/payments`): a Razorpay client over `fetch`, an in-memory fake with the same interface for tests, and checkout and webhook signature checks
 - `/dev/checkout` (development only) and [docs/runbooks/payments-local.md](docs/runbooks/payments-local.md) for paying in Razorpay test mode by hand
 - Settings `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`; without keys the API runs and payment endpoints answer 503
-- Money rules in the database, each with a test: an order is for exactly its booking's total (a composite foreign key, which also freezes the total); at most one payment confirms a booking; a refund is for the full payment and happens at most once; every Razorpay id is recorded once
+- Worker settings `REFUND_SWEEP_INTERVAL_MS`, `RECONCILE_INTERVAL_MS`; the worker reads the Razorpay keys and runs refunds and the reconciler only when they are set
 
 ## [0.3.0] - 2026-10-15
 
@@ -87,7 +91,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tilak-raaz/Tixora/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tilak-raaz/Tixora/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tilak-raaz/Tixora/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tilak-raaz/Tixora/releases/tag/v0.1.0

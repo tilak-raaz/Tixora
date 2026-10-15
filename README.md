@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M2 done (seat holds, v0.3.0); M3 next (payments).** Only what is listed under "What works today" is built. Everything
+> **Status: M3 done (payments, v0.4.0); M4 next (outbox, queues, email tickets).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
@@ -20,13 +20,18 @@ async processing and distributed rate limiting.
   idempotent retries
 - Hold expiry: a delayed job per hold releases its seats when the hold runs out, and a sweeper in
   every worker catches any job that was lost, so a crash or a Redis outage never strands seats
+- Payments with Razorpay: one order per booking (safe to retry, even after a crash); only a
+  signed webhook or the reconciler confirms a booking, never the browser; late, duplicate and
+  wrong-amount payments are refunded automatically, and refunds are retried until Razorpay settles
+  them. Pay by hand in test mode at `/dev/checkout`
+  ([runbook](docs/runbooks/payments-local.md))
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, plus integration tests against real Postgres and Redis containers
 
 ## Stack
 
-TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ ·
+TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ · Razorpay ·
 Zod · pino · Vitest + Testcontainers · Docker Compose · GitHub Actions
 
 ## Quickstart
@@ -89,3 +94,7 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
   locking strategies. Putting a Redis lock in front of Postgres cut median hold latency under
   contention from 193 ms to 7 ms, which overturned the first choice of default
   ([benchmark](docs/benchmarks/m2-hold-strategies.md), [ADR 0005](docs/adr/0005-seat-hold-strategy.md)).
+- **Payments:** forged, redelivered (including 10 copies at once), reordered, late, double and
+  never-delivered webhooks are all tested, and six money-and-seat invariants are checked after
+  every one: no booking is confirmed without exactly one applied payment, and every other captured
+  payment is refunded exactly once ([ADR 0007](docs/adr/0007-payment-confirmation.md)).
