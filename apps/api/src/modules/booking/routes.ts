@@ -1,4 +1,4 @@
-import type { Pool } from '@bmt/platform';
+import type { Logger, Pool, Redis } from '@bmt/platform';
 import { Router } from 'express';
 import { AppError } from '../../lib/errors';
 import { hashRequest, idempotent } from '../../lib/idempotency';
@@ -7,11 +7,18 @@ import type { Auth } from '../auth/auth';
 import { requireAuth } from '../auth/middleware';
 import { bookingIdParam, createHoldSchema } from './schemas';
 import { createBookingService, DEFAULT_BOOKING_CONFIG, type BookingConfig } from './service';
+import { createStrategy } from './strategies';
 
 /** Bookings for the signed-in user. Mounted at /api/v1. */
-export function bookingRouter(deps: { pool: Pool; auth: Auth; booking?: BookingConfig }): Router {
+export function bookingRouter(deps: {
+  pool: Pool;
+  redis: Redis;
+  logger: Logger;
+  auth: Auth;
+  booking?: BookingConfig;
+}): Router {
   const config = deps.booking ?? DEFAULT_BOOKING_CONFIG;
-  const bookings = createBookingService(deps.pool, config);
+  const bookings = createBookingService(deps.pool, config, createStrategy(config.strategy, deps));
   const holdSchema = createHoldSchema(config.maxSeatsPerBooking);
   const router = Router();
   const signedIn = requireAuth(deps.auth);

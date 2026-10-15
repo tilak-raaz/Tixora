@@ -2,6 +2,7 @@ import { baseEnvSchema, parseEnv } from '@bmt/platform';
 import { z } from 'zod';
 import type { AuthConfig } from './modules/auth/auth';
 import type { BookingConfig } from './modules/booking/service';
+import { HOLD_STRATEGIES } from './modules/booking/strategies';
 
 export const apiEnvSchema = baseEnvSchema.extend({
   PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
@@ -20,6 +21,8 @@ export const apiEnvSchema = baseEnvSchema.extend({
   /** How long held seats stay reserved for payment. */
   HOLD_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
   MAX_SEATS_PER_BOOKING: z.coerce.number().int().min(1).max(20).default(5),
+  /** How seats are taken: redis (default), conditional or pessimistic (ADR 0005). */
+  HOLD_STRATEGY: z.enum(HOLD_STRATEGIES).default('redis'),
 });
 
 export type ApiConfig = z.output<typeof apiEnvSchema>;
@@ -32,6 +35,7 @@ export function bookingConfigFrom(config: ApiConfig): BookingConfig {
   return {
     holdTtlSeconds: config.HOLD_TTL_SECONDS,
     maxSeatsPerBooking: config.MAX_SEATS_PER_BOOKING,
+    strategy: config.HOLD_STRATEGY,
   };
 }
 
