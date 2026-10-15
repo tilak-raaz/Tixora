@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M2 in progress (seat holds).** Only what is listed under "What works today" is built. Everything
+> **Status: M2 done (seat holds, v0.3.0); M3 next (payments).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
