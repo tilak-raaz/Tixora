@@ -8,6 +8,7 @@
     "start": "tsx src/server.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
     "create-admin": "tsx src/scripts/create-admin.ts",
+    "seed": "tsx src/scripts/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",

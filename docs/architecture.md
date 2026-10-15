@@ -76,14 +76,14 @@ that decides which shows fall on a given calendar date there.
 
 ## Status by milestone
 
-| Area                          | Milestone | State       |
-| ----------------------------- | --------- | ----------- |
-| Foundations                   | M0        | Done        |
-| Accounts and catalog          | M1        | In progress |
-| Seat holds                    | M2        | Planned     |
-| Payments                      | M3        | Planned     |
-| Outbox and queues             | M4        | Planned     |
-| Rate limiting and caching     | M5        | Planned     |
-| Frontend                      | M6        | Planned     |
-| Replicas, load, failure tests | M7        | Planned     |
-| Deployment                    | M8        | Planned     |
+| Area                          | Milestone | State   |
+| ----------------------------- | --------- | ------- |
+| Foundations                   | M0        | Done    |
+| Accounts and catalog          | M1        | Done    |
+| Seat holds                    | M2        | Planned |
+| Payments                      | M3        | Planned |
+| Outbox and queues             | M4        | Planned |
+| Rate limiting and caching     | M5        | Planned |
+| Frontend                      | M6        | Planned |
+| Replicas, load, failure tests | M7        | Planned |
+| Deployment                    | M8        | Planned |

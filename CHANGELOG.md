@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
+M1: accounts and catalog.
+
 ### Added
 
 - Accounts with Better Auth (ADR 0004): email + password sign-up, sign-in and sign-out under `/api/auth`
@@ -16,6 +20,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `0003_catalog.sql`: cities, theatres, screens, seat categories, seats, movies, shows, show prices and per-show seat inventory
 - Database rules for the catalog, each with a test: no overlapping shows on a screen, unique seats per screen, hold/expiry consistency, positive paise prices
 - Data model section with an ER diagram in `docs/architecture.md`
+- Admin API under `/api/v1/admin` (admin role only): cities, seat categories, theatres, screens with their seat layout, movies, shows
+- Creating a show creates its prices and its whole seat inventory in one transaction; ends at start + duration + 15 min cleaning
+- Overlapping shows are refused with 409 by the database's exclusion constraint, so two admins racing for one slot cannot both win
+- Public browse API: cities, movies in a city on a date (in the city's time zone), a movie's shows by theatre with free-seat counts, show details, seat map
+- Seat map reports only `AVAILABLE` / `UNAVAILABLE`; expired holds count as available
+- `parseBody` / `parseQuery` / `parseParams` validation helpers and constraint-violation mapping to 409 / 400
+- `formatPaise` in `packages/shared`
+- `make seed`: demo data for Rourkela, 2 theatres, 3 screens, 3 movies, 4 shows a day for 7 days
 
 ## [0.1.0] - 2026-10-14
 
@@ -32,5 +44,6 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/book-my-ticket/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/tilak-raaz/book-my-ticket/releases/tag/v0.1.0
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/tilak-raaz/Tixora/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/tilak-raaz/Tixora/releases/tag/v0.1.0
