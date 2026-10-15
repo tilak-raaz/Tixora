@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- `0005_payments.sql`: `payment_orders`, `payments`, `refunds` and `payment_webhook_events`
+- Money rules in the database, each with a test: an order is for exactly its booking's total (a composite foreign key, which also freezes the total); at most one payment confirms a booking; a refund is for the full payment and happens at most once; every Razorpay id is recorded once
+
 ## [0.3.0] - 2026-10-15
 
 M2: seat holds and concurrency.

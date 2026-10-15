@@ -44,8 +44,9 @@ SQL. Tests call services directly against a real database for concurrency work.
 
 ## Data model
 
-Identity, catalog and bookings as of M2. Seat ownership lives only in `show_seats`; bookings (M2) change
-it with a conditional `UPDATE` on those rows.
+Identity, catalog, bookings and payments as of M3. Seat ownership lives only in `show_seats`; bookings (M2) change
+it with a conditional `UPDATE` on those rows. A booking has at most one Razorpay order; every captured
+payment is recorded, at most one confirms the booking, and any other is refunded in full.
 
 ```mermaid
 erDiagram
@@ -66,6 +67,9 @@ erDiagram
     show_seats ||--o{ booking_seats : ""
     bookings |o--o{ show_seats : "holds or owns"
     users ||--o{ accounts : "signs in with"
+    bookings ||--o| payment_orders : "paid through"
+    payment_orders ||--o{ payments : captures
+    payments ||--o| refunds : "refunded by"
 ```
 
 | Rule                                                                                | Enforced by                                                                |
@@ -77,6 +81,10 @@ erDiagram
 | At most one pending booking per user per show                                       | `bookings_one_pending_per_user_show`                                       |
 | Money is positive whole paise                                                       | `CHECK (price_paise > 0)` ([ADR 0003](adr/0003-money-as-integer-paise.md)) |
 | One account per email, ignoring case                                                | `users_email_lower_key`                                                    |
+| A booking has at most one order, for exactly its total, which is then frozen        | `payment_orders_booking_key`, `payment_orders_amount_matches_booking`      |
+| At most one payment confirms a booking                                              | `payments_one_applied_per_order`                                           |
+| A refund is for the full payment, at most once per payment                          | `refunds_full_amount`, `refunds_payment_key`                               |
+| A Razorpay order, payment, refund or webhook event is recorded once                 | unique keys on each Razorpay id, `payment_webhook_events_pkey`             |
 
 Times are stored as `timestamptz` in UTC. Each city has a `timezone` (default `Asia/Kolkata`)
 that decides which shows fall on a given calendar date there.
