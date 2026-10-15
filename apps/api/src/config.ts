@@ -34,7 +34,7 @@ export const apiEnvSchema = baseEnvSchema
       z.string().regex(/^rzp_(test|live)_/, 'must start with rzp_test_ or rzp_live_'),
     ),
     RAZORPAY_KEY_SECRET: optional(z.string().min(1)),
-    /** Set in M3 PR 3, when webhooks arrive. */
+    /** The secret set on the webhook in the Razorpay Dashboard; without it webhooks answer 503. */
     RAZORPAY_WEBHOOK_SECRET: optional(z.string().min(1)),
   })
   .refine((c) => Boolean(c.RAZORPAY_KEY_ID) === Boolean(c.RAZORPAY_KEY_SECRET), {

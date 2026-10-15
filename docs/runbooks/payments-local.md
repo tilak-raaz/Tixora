@@ -38,12 +38,36 @@ Open <http://localhost:4000/dev/checkout> and go top to bottom:
 
 The log at the bottom shows every request and response.
 
-## What to expect at this stage
+## What to expect
 
 - `POST /bookings/:id/payment-order` returns `201` the first time and the same order (`200`)
   after that. With under a minute of the hold left it refuses with `409 HOLD_ENDING_SOON`.
 - After paying, the page checks Checkout's signature (`/payment/verify`) and polls the booking.
-  **It stays `PENDING_PAYMENT`** until the webhook lands in M3 PR 3: the browser is never
-  trusted to confirm a payment.
-- If the hold expires first, the booking becomes `EXPIRED`. From PR 3 such a late payment is
-  refunded automatically.
+  It becomes `CONFIRMED` only when Razorpay's webhook arrives (next section): the browser is
+  never trusted to confirm a payment. Without webhooks set up, it stays `PENDING_PAYMENT`.
+
+## Webhooks to your laptop
+
+Razorpay confirms payments by calling `POST /webhooks/razorpay`, so it has to reach
+`localhost:4000`. A Cloudflare quick tunnel does that with no account:
+
+```bash
+brew install cloudflared                        # once
+cloudflared tunnel --url http://localhost:4000  # prints https://<random>.trycloudflare.com
+```
+
+Then, in the Razorpay Dashboard (Test Mode) → **Account & Settings → Webhooks → Add New Webhook**:
+
+- **Webhook URL:** `https://<random>.trycloudflare.com/webhooks/razorpay`
+- **Secret:** generate one with `openssl rand -hex 32` and put the same value in `.env` as
+  `RAZORPAY_WEBHOOK_SECRET`, then restart `make dev-api`
+- **Active events:** `payment.captured`, `order.paid`, `payment.failed`
+
+The quick-tunnel URL changes every time `cloudflared` starts; update the webhook URL when it
+does. The secret can stay.
+
+Now pay on `/dev/checkout` as above: within a few seconds the page shows the booking
+`CONFIRMED`, and `make dev-api` logs the webhook. To see the late-payment path, hold seats, wait
+for the 5 minutes to pass with Checkout open, then pay: the booking stays `EXPIRED` and a
+`HOLD_ENDED` refund is recorded (`make psql`, then `SELECT * FROM refunds;`). Sending refunds to
+Razorpay arrives in M3 PR 4.
