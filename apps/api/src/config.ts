@@ -1,6 +1,7 @@
 import { baseEnvSchema, parseEnv } from '@bmt/platform';
 import { z } from 'zod';
 import type { AuthConfig } from './modules/auth/auth';
+import type { BookingConfig } from './modules/booking/service';
 
 export const apiEnvSchema = baseEnvSchema.extend({
   PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
@@ -16,12 +17,22 @@ export const apiEnvSchema = baseEnvSchema.extend({
         .map((origin) => origin.trim())
         .filter(Boolean),
     ),
+  /** How long held seats stay reserved for payment. */
+  HOLD_TTL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+  MAX_SEATS_PER_BOOKING: z.coerce.number().int().min(1).max(20).default(5),
 });
 
 export type ApiConfig = z.output<typeof apiEnvSchema>;
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): ApiConfig {
   return parseEnv(apiEnvSchema, env);
+}
+
+export function bookingConfigFrom(config: ApiConfig): BookingConfig {
+  return {
+    holdTtlSeconds: config.HOLD_TTL_SECONDS,
+    maxSeatsPerBooking: config.MAX_SEATS_PER_BOOKING,
+  };
 }
 
 export function authConfigFrom(config: ApiConfig): AuthConfig {

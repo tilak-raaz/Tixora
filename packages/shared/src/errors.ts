@@ -12,6 +12,12 @@ export const ERROR_CODES = [
   'RATE_LIMITED',
   'SERVICE_UNAVAILABLE',
   'INTERNAL',
+  // Bookings
+  'SEATS_UNAVAILABLE',
+  'ACTIVE_HOLD_EXISTS',
+  'HOLD_NOT_ACTIVE',
+  'IDEMPOTENCY_KEY_REUSED',
+  'REQUEST_IN_PROGRESS',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
