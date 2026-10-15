@@ -14,6 +14,7 @@ npm install          # also installs the git hooks (needs `git init` first)
 make up              # Postgres :5432, Redis :6379, Mailpit UI :8025
 make migrate
 make create-admin     # admin account from ADMIN_* in .env
+make seed             # demo catalog: Rourkela, 2 theatres, a week of shows
 make dev-api         # in one terminal
 make dev-worker      # in another
 curl localhost:4000/readyz
@@ -40,6 +41,13 @@ curl -i -c cookies.txt -H 'origin: http://localhost:3000' -H 'content-type: appl
 
 # who am I?
 curl -b cookies.txt localhost:4000/api/v1/me
+```
+
+## Browsing the seeded catalog
+
+```bash
+curl localhost:4000/api/v1/cities
+curl localhost:4000/api/v1/cities/rourkela/movies
 ```
 
 ## Adding a migration

@@ -16,6 +16,7 @@
     "dev:worker": "npm run dev -w @bmt/worker",
     "migrate": "npm run migrate -w @bmt/api",
     "create-admin": "npm run create-admin -w @bmt/api",
+    "seed": "npm run seed -w @bmt/api",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
