@@ -104,6 +104,20 @@ A seat whose hold has run out is free to the next buyer straight away; the job a
 only make the stored state catch up ([ADR 0005](adr/0005-seat-hold-strategy.md),
 [ADR 0006](adr/0006-hold-expiry.md)).
 
+## Life of a payment
+
+```text
+POST /bookings/:id/payment-order ──▶ Razorpay order (receipt = booking id), stored once
+browser: Razorpay Checkout ──▶ success callback ──▶ /payment/verify (signature only; confirms nothing)
+Razorpay ──▶ POST /webhooks/razorpay ──▶ one transaction:
+               store event (dedupe by event id) ─▶ record payment (dedupe by payment id)
+               ─▶ lock booking ─▶ hold active and all seats still ours?
+                      yes: seats BOOKED, booking CONFIRMED, payment applied
+                      no:  refund recorded (HOLD_ENDED / DUPLICATE_PAYMENT / AMOUNT_MISMATCH)
+```
+
+See [ADR 0007](adr/0007-payment-confirmation.md).
+
 ## Status by milestone
 
 | Area                          | Milestone | State   |

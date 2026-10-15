@@ -2,7 +2,7 @@
   "name": "@bmt/payments",
   "version": "0.0.0",
   "private": true,
-  "description": "Razorpay client, an in-memory fake with the same interface, and signature checks; shared by the API and the worker",
+  "description": "Razorpay client, an in-memory fake with the same interface, signature checks, and applying a captured payment to its booking; shared by the API and the worker",
   "type": "module",
   "exports": {
     ".": {
@@ -12,5 +12,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bmt/platform": "*"
   }
 }

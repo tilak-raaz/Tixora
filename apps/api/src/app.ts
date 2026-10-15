@@ -14,6 +14,7 @@ import type { BookingConfig } from './modules/booking/service';
 import { adminCatalogRouter, catalogRouter } from './modules/catalog/routes';
 import { paymentRouter } from './modules/payment/routes';
 import type { PaymentConfig } from './modules/payment/service';
+import { razorpayWebhookRouter } from './modules/payment/webhook';
 import { healthRouter } from './routes/health';
 
 export interface AppDeps {
@@ -28,6 +29,8 @@ export interface AppDeps {
   /** Razorpay (or the fake in tests); without it the payment endpoints answer 503. */
   paymentGateway?: PaymentGateway;
   payment?: PaymentConfig;
+  /** Verifies Razorpay webhooks; without it /webhooks/razorpay answers 503. */
+  paymentWebhookSecret?: string;
   /** Serves /dev/checkout. Development only. */
   devPages?: boolean;
 }
@@ -48,6 +51,10 @@ export function createApp(deps: AppDeps): Express {
   // Better Auth's endpoints (sign-up, sign-in, sign-out, get-session).
   // Mounted before express.json() because Better Auth reads the raw body itself.
   app.all('/api/auth/*splat', toNodeHandler(deps.auth));
+
+  // Razorpay webhooks need the raw body to check its signature, so they also
+  // come before express.json().
+  app.use(razorpayWebhookRouter(deps));
 
   app.use(express.json({ limit: '100kb' }));
 

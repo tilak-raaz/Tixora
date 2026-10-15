@@ -45,6 +45,7 @@ const app = createApp({
   booking: bookingConfigFrom(config),
   holdExpiry: createHoldExpiryScheduler(holdExpiryQueue, logger),
   paymentGateway: razorpay ? createRazorpayGateway(razorpay) : undefined,
+  paymentWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
   devPages: config.NODE_ENV === 'development',
 });
 
