@@ -46,6 +46,7 @@ make test        # unit + integration (starts its own containers)
 ```
 
 `make help` lists every target. Full setup notes: [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md).
+Paying by hand in Razorpay test mode: [docs/runbooks/payments-local.md](docs/runbooks/payments-local.md).
 
 ## Repository layout
 
@@ -53,6 +54,7 @@ make test        # unit + integration (starts its own containers)
 apps/api          Express API (modules mount under /api/v1)
 apps/worker       Background jobs: outbox relay, email, hold expiry, reconciliation
 packages/jobs     Background jobs (BullMQ queues and their SQL), shared by API and worker
+packages/payments Razorpay client, a fake for tests, signature checks
 packages/platform Server-side building blocks: env, logger, Postgres, Redis, migrations
 packages/shared   Types and constants shared with the frontend
 db/migrations     Forward-only SQL migrations (NNNN_name.sql)

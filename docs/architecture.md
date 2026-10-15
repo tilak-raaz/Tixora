@@ -35,6 +35,7 @@ Razorpay ──webhooks──┘                      ▼
 | `apps/api`          | HTTP layer. Each module in `src/modules/<name>/` has `routes`, `service`, `repo`, `schemas`  |
 | `apps/worker`       | Queue consumers, outbox relay, hold-expiry sweeper, payment reconciler                       |
 | `packages/jobs`     | Queue names, job payloads and their SQL, shared by the API (producer) and worker (consumer)  |
+| `packages/payments` | Razorpay client over `fetch`, an in-memory fake with the same interface, signature checks    |
 | `packages/platform` | Server-only building blocks: env parsing, logger, Postgres pool, Redis, migrations, shutdown |
 | `packages/shared`   | Types, schemas and constants safe to use in the browser                                      |
 | `db/migrations`     | Forward-only SQL, applied by `packages/platform/src/migrate.ts`                              |

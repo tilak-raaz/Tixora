@@ -18,6 +18,10 @@ export const ERROR_CODES = [
   'HOLD_NOT_ACTIVE',
   'IDEMPOTENCY_KEY_REUSED',
   'REQUEST_IN_PROGRESS',
+  // Payments
+  'HOLD_ENDING_SOON',
+  'PAYMENT_GATEWAY_ERROR',
+  'PAYMENT_SIGNATURE_INVALID',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
