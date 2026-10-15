@@ -1,4 +1,3 @@
-import type { HoldExpiryScheduler } from '@bmt/jobs';
 import type { Logger, Pool, Redis } from '@bmt/platform';
 import { Router } from 'express';
 import { AppError } from '../../lib/errors';
@@ -17,15 +16,9 @@ export function bookingRouter(deps: {
   logger: Logger;
   auth: Auth;
   booking?: BookingConfig;
-  holdExpiry?: HoldExpiryScheduler;
 }): Router {
   const config = deps.booking ?? DEFAULT_BOOKING_CONFIG;
-  const bookings = createBookingService(
-    deps.pool,
-    config,
-    createStrategy(config.strategy, deps),
-    deps.holdExpiry,
-  );
+  const bookings = createBookingService(deps.pool, config, createStrategy(config.strategy, deps));
   const holdSchema = createHoldSchema(config.maxSeatsPerBooking);
   const router = Router();
   const signedIn = requireAuth(deps.auth);
