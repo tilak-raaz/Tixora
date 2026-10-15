@@ -114,6 +114,10 @@ Razorpay ──▶ POST /webhooks/razorpay ──▶ one transaction:
                ─▶ lock booking ─▶ hold active and all seats still ours?
                       yes: seats BOOKED, booking CONFIRMED, payment applied
                       no:  refund recorded (HOLD_ENDED / DUPLICATE_PAYMENT / AMOUNT_MISMATCH)
+worker: refund job ──▶ Razorpay refund (receipt = refund id) ──▶ PENDING → PROCESSED / FAILED
+        refund sweeper (5 min) re-queues refunds still PENDING; refund.* webhooks settle them
+worker: reconciler (2 min) ──▶ unconfirmed orders 1 min to 24 h old, each at most every 10 min
+        ──▶ Razorpay: payments of this order ──▶ same confirm-or-refund code as the webhook
 ```
 
 See [ADR 0007](adr/0007-payment-confirmation.md).

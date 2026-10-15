@@ -1,13 +1,16 @@
 import type { RazorpayConfig } from '@bmt/payments';
-import { baseEnvSchema, parseEnv } from '@bmt/platform';
+import {
+  baseEnvSchema,
+  optionalEnv,
+  parseEnv,
+  RAZORPAY_PAIR_ISSUE,
+  razorpayEnvShape,
+  razorpayKeysPaired,
+} from '@bmt/platform';
 import { z } from 'zod';
 import type { AuthConfig } from './modules/auth/auth';
 import type { BookingConfig } from './modules/booking/service';
 import { HOLD_STRATEGIES } from './modules/booking/strategies';
-
-/** An empty value in .env (KEY=) means "not set". */
-const optional = <S extends z.ZodType>(schema: S) =>
-  z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
 
 export const apiEnvSchema = baseEnvSchema
   .extend({
@@ -30,17 +33,11 @@ export const apiEnvSchema = baseEnvSchema
     /** How seats are taken: redis (default), conditional or pessimistic (ADR 0005). */
     HOLD_STRATEGY: z.enum(HOLD_STRATEGIES).default('redis'),
     /** Razorpay test or live keys. Without them the payment endpoints answer 503. */
-    RAZORPAY_KEY_ID: optional(
-      z.string().regex(/^rzp_(test|live)_/, 'must start with rzp_test_ or rzp_live_'),
-    ),
-    RAZORPAY_KEY_SECRET: optional(z.string().min(1)),
+    ...razorpayEnvShape,
     /** The secret set on the webhook in the Razorpay Dashboard; without it webhooks answer 503. */
-    RAZORPAY_WEBHOOK_SECRET: optional(z.string().min(1)),
+    RAZORPAY_WEBHOOK_SECRET: optionalEnv(z.string().min(1)),
   })
-  .refine((c) => Boolean(c.RAZORPAY_KEY_ID) === Boolean(c.RAZORPAY_KEY_SECRET), {
-    path: ['RAZORPAY_KEY_SECRET'],
-    message: 'set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither',
-  });
+  .refine(razorpayKeysPaired, RAZORPAY_PAIR_ISSUE);
 
 export type ApiConfig = z.output<typeof apiEnvSchema>;
 

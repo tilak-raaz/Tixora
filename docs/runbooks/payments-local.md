@@ -61,13 +61,22 @@ Then, in the Razorpay Dashboard (Test Mode) → **Account & Settings → Webhook
 - **Webhook URL:** `https://<random>.trycloudflare.com/webhooks/razorpay`
 - **Secret:** generate one with `openssl rand -hex 32` and put the same value in `.env` as
   `RAZORPAY_WEBHOOK_SECRET`, then restart `make dev-api`
-- **Active events:** `payment.captured`, `order.paid`, `payment.failed`
+- **Active events:** `payment.captured`, `order.paid`, `payment.failed`, `refund.processed`,
+  `refund.failed`
 
 The quick-tunnel URL changes every time `cloudflared` starts; update the webhook URL when it
 does. The secret can stay.
 
 Now pay on `/dev/checkout` as above: within a few seconds the page shows the booking
 `CONFIRMED`, and `make dev-api` logs the webhook. To see the late-payment path, hold seats, wait
-for the 5 minutes to pass with Checkout open, then pay: the booking stays `EXPIRED` and a
-`HOLD_ENDED` refund is recorded (`make psql`, then `SELECT * FROM refunds;`). Sending refunds to
-Razorpay arrives in M3 PR 4.
+for the 5 minutes to pass with Checkout open, then pay: the booking stays `EXPIRED`, a
+`HOLD_ENDED` refund is recorded, and with `make dev-worker` running it is sent to Razorpay within
+seconds (`make psql`, then `SELECT reason, status, razorpay_refund_id FROM refunds;`). It shows
+up under **Transactions → Refunds** in the Dashboard.
+
+## Webhooks that never arrive
+
+Stop `cloudflared` (or delete the webhook), pay on `/dev/checkout`, and watch the booking stay
+`PENDING_PAYMENT`. Within about 3 minutes the worker's reconciler asks Razorpay about the order,
+finds the captured payment and confirms the booking (or refunds it, if the hold had ended). The
+worker logs `reconciler applied payments the webhook never delivered`.

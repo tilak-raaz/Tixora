@@ -1,4 +1,14 @@
-import { createHoldExpiryWorker, startHoldSweeper } from '@bmt/jobs';
+import {
+  createHoldExpiryWorker,
+  createRefundQueue,
+  createRefundScheduler,
+  createRefundWorker,
+  startHoldSweeper,
+  startReconciler,
+  startRefundSweeper,
+  type Periodic,
+} from '@bmt/jobs';
+import { createRazorpayGateway } from '@bmt/payments';
 import {
   createLogger,
   createPool,
@@ -6,12 +16,13 @@ import {
   installProcessHandlers,
   loadEnvFile,
 } from '@bmt/platform';
-import { ENV_FILE, loadConfig } from './config';
+import { ENV_FILE, loadConfig, razorpayConfigFrom } from './config';
 
 /**
  * Worker process: runs everything slow or retryable, separately from the API.
- * Today: hold expiry (a delayed job per hold, plus a sweeper as the safety net).
- * M3 adds the payment reconciler; M4 the outbox relay, email and tickets.
+ * Today: hold expiry (a delayed job per hold, plus a sweeper as the safety net),
+ * refunds (a job per refund, plus a sweeper) and the payment reconciler.
+ * M4 adds the outbox relay, email and tickets.
  */
 loadEnvFile(ENV_FILE);
 const config = loadConfig();
@@ -57,12 +68,38 @@ const sweeper = startHoldSweeper(
   { pool, logger },
   { intervalMs: config.HOLD_SWEEP_INTERVAL_MS, batchSize: config.HOLD_SWEEP_BATCH_SIZE },
 );
+const queues = ['hold-expiry'];
+const periodic: Periodic[] = [sweeper];
+const closers: (() => Promise<void>)[] = [() => holdExpiry.close()];
+
+const razorpay = razorpayConfigFrom(config);
+if (razorpay) {
+  const gateway = createRazorpayGateway(razorpay);
+  const refundQueue = createRefundQueue(config.REDIS_URL);
+  refundQueue.on('error', (err) => logger.error({ err }, 'refund queue error'));
+  const refundWorker = createRefundWorker({ redisUrl: config.REDIS_URL, pool, gateway, logger });
+  periodic.push(
+    startRefundSweeper(
+      { pool, queue: refundQueue, logger },
+      { intervalMs: config.REFUND_SWEEP_INTERVAL_MS },
+    ),
+    startReconciler(
+      { pool, gateway, logger, refunds: createRefundScheduler(refundQueue, logger) },
+      { intervalMs: config.RECONCILE_INTERVAL_MS },
+    ),
+  );
+  closers.push(
+    () => refundWorker.close(),
+    () => refundQueue.close(),
+  );
+  queues.push('refunds');
+} else {
+  logger.warn('RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not set: no refunds, no reconciler');
+}
+
 stopConsumers = async () => {
-  await sweeper.stop();
-  await holdExpiry.close();
+  await Promise.all(periodic.map((p) => p.stop()));
+  for (const close of closers) await close();
 };
 
-logger.info(
-  { queues: ['hold-expiry'], sweepIntervalMs: config.HOLD_SWEEP_INTERVAL_MS },
-  'worker ready',
-);
+logger.info({ queues, sweepIntervalMs: config.HOLD_SWEEP_INTERVAL_MS }, 'worker ready');

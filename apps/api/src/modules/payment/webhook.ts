@@ -1,7 +1,10 @@
 import { withTransaction, type Logger, type Pool } from '@bmt/platform';
+import type { RefundScheduler } from '@bmt/jobs';
 import {
   applyCapturedPayment,
   capturedPaymentFrom,
+  recordRefundState,
+  refundUpdateFrom,
   verifyWebhookSignature,
   type CaptureOutcome,
   type RazorpayEvent,
@@ -25,6 +28,7 @@ export function razorpayWebhookRouter(deps: {
   pool: Pool;
   logger: Logger;
   paymentWebhookSecret?: string;
+  refunds?: RefundScheduler;
 }): Router {
   const router = Router();
 
@@ -67,12 +71,23 @@ export function razorpayWebhookRouter(deps: {
         if (rowCount === 0) return 'duplicate_event' as const;
 
         const captured = capturedPaymentFrom(event);
+        if (captured) return applyCapturedPayment(tx, captured);
+
+        const refund = refundUpdateFrom(event);
+        if (refund) {
+          return (await recordRefundState(tx, refund))
+            ? ('refund_updated' as const)
+            : ('ignored' as const);
+        }
         // payment.failed and anything else: stored, nothing to do. The booking
         // stays PENDING_PAYMENT and the buyer can try again until the hold ends.
-        if (!captured) return 'ignored' as const;
-        return applyCapturedPayment(tx, captured);
+        return 'ignored' as const;
       });
 
+      // Only after the commit: the refund row must exist before its job runs.
+      if (typeof result !== 'string' && result.kind === 'refund') {
+        await deps.refunds?.schedule(result.refundId);
+      }
       log(deps.logger, eventId, String(event.event), result);
       res.json({ received: true });
     },
@@ -85,7 +100,7 @@ function log(
   logger: Logger,
   eventId: string,
   type: string,
-  result: CaptureOutcome | 'duplicate_event' | 'ignored',
+  result: CaptureOutcome | 'duplicate_event' | 'ignored' | 'refund_updated',
 ): void {
   if (typeof result === 'string') {
     logger.info({ eventId, type, result }, 'razorpay webhook');

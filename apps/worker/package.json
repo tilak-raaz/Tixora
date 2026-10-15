@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@bmt/jobs": "*",
+    "@bmt/payments": "*",
     "@bmt/platform": "*",
     "zod": "^4.1.0"
   }

@@ -1,6 +1,7 @@
 import type { Logger, Pool, PoolClient } from '@bmt/platform';
 import { Queue, Worker } from 'bullmq';
 import { QUEUE_PREFIX, queueConnection, type QueueOptions } from './connection';
+import { startPeriodic, withTimeout, type Periodic } from './periodic';
 
 /**
  * Hold expiry (ADR 0006). A hold's seats are already free for other buyers the
@@ -182,10 +183,7 @@ export function createHoldExpiryWorker(
   return worker;
 }
 
-export interface HoldSweeper {
-  /** Stops scheduling sweeps and waits for one in progress to finish. */
-  stop(): Promise<void>;
-}
+export type HoldSweeper = Periodic;
 
 /**
  * Sweeps once at start-up (catching holds that ran out while workers were
@@ -197,42 +195,14 @@ export function startHoldSweeper(
   deps: { pool: Pool; logger: Logger },
   opts: { intervalMs: number; batchSize: number },
 ): HoldSweeper {
-  let stopped = false;
-  let timer: NodeJS.Timeout | undefined;
-  let running: Promise<void> = Promise.resolve();
-
-  const sweep = async (): Promise<void> => {
-    try {
+  return startPeriodic(
+    'hold sweep',
+    async () => {
       const released = await drainExpiredHolds(deps.pool, opts.batchSize);
       if (released.length > 0) {
         deps.logger.info({ released: released.length }, 'sweeper released expired holds');
       }
-    } catch (err) {
-      deps.logger.error({ err }, 'hold sweep failed');
-    }
-  };
-
-  const loop = (): void => {
-    if (stopped) return;
-    running = sweep().then(() => {
-      if (!stopped) timer = setTimeout(loop, opts.intervalMs * (0.8 + Math.random() * 0.4));
-    });
-  };
-  loop();
-
-  return {
-    async stop() {
-      stopped = true;
-      clearTimeout(timer);
-      await running;
     },
-  };
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    { intervalMs: opts.intervalMs, logger: deps.logger },
+  );
 }
