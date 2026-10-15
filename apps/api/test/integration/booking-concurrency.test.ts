@@ -1,29 +1,36 @@
-import { createLogger, createPool, type Pool } from '@bmt/platform';
+import { createLogger, createPool, createRedis, type Pool, type Redis } from '@bmt/platform';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { AppError } from '../../src/lib/errors';
-import { createBookingService, type BookingService } from '../../src/modules/booking/service';
+import {
+  createBookingService,
+  DEFAULT_BOOKING_CONFIG,
+  type BookingService,
+} from '../../src/modules/booking/service';
+import { createStrategy, HOLD_STRATEGIES } from '../../src/modules/booking/strategies';
 import { createShowFixture, createUsers } from './fixtures';
 
 /**
  * The core claim of the project: under contention, a seat goes to exactly one
- * buyer. Three independent services with their own connection pools stand in
- * for three API replicas sharing one database.
+ * buyer. Three independent services, each with its own Postgres pool and Redis
+ * client, stand in for three API replicas. Every hold strategy must pass the
+ * same suite.
  */
 
 const logger = createLogger({ name: 'test', level: 'silent' });
 let pool: Pool;
 let replicaPools: Pool[];
-let replicas: BookingService[];
+let replicaRedis: Redis[];
 
 beforeAll(() => {
   const connect = (applicationName: string) =>
     createPool({ connectionString: inject('databaseUrl'), max: 10, applicationName, logger });
   pool = connect('bmt-test');
   replicaPools = ['replica-1', 'replica-2', 'replica-3'].map(connect);
-  replicas = replicaPools.map((p) => createBookingService(p));
+  replicaRedis = replicaPools.map(() => createRedis(inject('redisUrl'), logger));
 });
 afterAll(async () => {
   await Promise.all([pool, ...replicaPools].map((p) => p.end()));
+  await Promise.all(replicaRedis.map((r) => r.quit()));
 });
 
 /** Resolves once `count` callers are waiting: makes requests arrive "at the same time". */
@@ -90,7 +97,19 @@ describe('the race this design prevents', () => {
   });
 });
 
-describe('holds under contention', () => {
+describe.each(HOLD_STRATEGIES)('holds under contention, %s strategy', (strategyName) => {
+  let replicas: BookingService[];
+
+  beforeAll(() => {
+    replicas = replicaPools.map((p, i) =>
+      createBookingService(
+        p,
+        { ...DEFAULT_BOOKING_CONFIG, strategy: strategyName },
+        createStrategy(strategyName, { redis: replicaRedis[i]!, logger }),
+      ),
+    );
+  });
+
   it('gives one seat to exactly one of 200 buyers spread over 3 replicas', async () => {
     const BUYERS = 200;
     const { showId, seatIds } = await createShowFixture(pool, 1);

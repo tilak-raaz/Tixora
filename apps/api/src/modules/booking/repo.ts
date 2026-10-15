@@ -58,40 +58,6 @@ export async function insertBooking(
   return rows[0]!;
 }
 
-/**
- * The hold itself: one statement that takes every requested seat or none.
- *
- * The CTE locks the requested rows in id order, so two bookings asking for
- * overlapping seats always queue in the same order and can never deadlock.
- * The UPDATE then re-checks each row's status AFTER getting its lock: a
- * request that waited behind a winner sees the seat already HELD and skips it.
- * The caller compares the number of rows updated with the number requested.
- *
- * A HELD seat whose hold has run out counts as free, so an abandoned hold
- * never blocks the seat even before the sweeper releases it.
- */
-export async function holdSeats(
-  db: Db,
-  hold: { bookingId: string; showId: string; showSeatIds: string[]; heldUntil: Date },
-): Promise<string[]> {
-  const { rows } = await db.query<{ id: string }>(
-    `WITH requested AS (
-       SELECT id FROM show_seats
-       WHERE show_id = $2 AND id = ANY($3::uuid[])
-       ORDER BY id
-       FOR NO KEY UPDATE
-     )
-     UPDATE show_seats ss
-     SET status = 'HELD', booking_id = $1, held_until = $4, version = ss.version + 1
-     FROM requested
-     WHERE ss.id = requested.id
-       AND (ss.status = 'AVAILABLE' OR (ss.status = 'HELD' AND ss.held_until <= now()))
-     RETURNING ss.id`,
-    [hold.bookingId, hold.showId, hold.showSeatIds, hold.heldUntil],
-  );
-  return rows.map((r) => r.id);
-}
-
 export async function insertBookingSeats(
   db: Db,
   bookingId: string,

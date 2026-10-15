@@ -79,5 +79,7 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
 
 ## Results
 
-Measured numbers (double bookings under contention, hold latency, rate-limit accuracy) are
-published here from M2 onward.
+- **Seat holds:** 0 double bookings with 200 buyers on one seat across 3 replicas, for all three
+  locking strategies. Putting a Redis lock in front of Postgres cut median hold latency under
+  contention from 193 ms to 7 ms, which overturned the first choice of default
+  ([benchmark](docs/benchmarks/m2-hold-strategies.md), [ADR 0005](docs/adr/0005-seat-hold-strategy.md)).

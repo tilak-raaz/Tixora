@@ -15,6 +15,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `GET /api/v1/bookings/:id` (owner only) and `DELETE /api/v1/bookings/:id/hold`
 - `HOLD_TTL_SECONDS` and `MAX_SEATS_PER_BOOKING` settings
 - Concurrency tests: the naive read-then-write double booking reproduced; 200 buyers over 3 replicas get exactly one winner; overlapping multi-seat holds never split
+- Three seat-hold strategies behind one interface, chosen with `HOLD_STRATEGY` (ADR 0005): `redis` (default: an all-or-nothing Redis lock in front of the conditional update), `conditional` (one statement) and `pessimistic` (`SELECT ... FOR UPDATE`, then update); the whole concurrency suite runs against each
+- `redis` became the default after the benchmark: under contention it cut median hold latency from about 190 ms to 7 ms, and it costs nothing without contention
+- The Redis strategy turns losers away before they touch Postgres, never decides ownership, and falls back to Postgres alone if Redis is down
+- `make bench`: benchmarks the three strategies in a throwaway database, checks invariants after every run, and writes `docs/benchmarks/m2-hold-strategies.md`
 
 ## [0.2.0] - 2026-10-15
 
