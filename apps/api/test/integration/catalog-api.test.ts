@@ -258,14 +258,27 @@ describe('browsing', () => {
       [showId],
     );
     const [booked, held, expired] = ids.rows.map((r) => r.id);
-    await deps.pool.query("UPDATE show_seats SET status = 'BOOKED' WHERE id = $1", [booked]);
+    // Held and booked seats must belong to a booking (0004), so make one to own them.
+    const owner = await deps.pool.query<{ id: string }>(
+      `WITH u AS (INSERT INTO users (name, email) VALUES ('Owner', $2) RETURNING id)
+       INSERT INTO bookings (user_id, show_id, total_paise, expires_at)
+       SELECT u.id, $1, 66000, now() + interval '5 minutes' FROM u RETURNING id`,
+      [showId, `owner-${randomUUID()}@example.com`],
+    );
+    const bookingId = owner.rows[0]!.id;
     await deps.pool.query(
-      "UPDATE show_seats SET status = 'HELD', held_until = now() + interval '10 minutes' WHERE id = $1",
-      [held],
+      "UPDATE show_seats SET status = 'BOOKED', booking_id = $2 WHERE id = $1",
+      [booked, bookingId],
     );
     await deps.pool.query(
-      "UPDATE show_seats SET status = 'HELD', held_until = now() - interval '1 minute' WHERE id = $1",
-      [expired],
+      `UPDATE show_seats SET status = 'HELD', booking_id = $2,
+              held_until = now() + interval '5 minutes' WHERE id = $1`,
+      [held, bookingId],
+    );
+    await deps.pool.query(
+      `UPDATE show_seats SET status = 'HELD', booking_id = $2,
+              held_until = now() - interval '1 minute' WHERE id = $1`,
+      [expired, bookingId],
     );
 
     const res = await request(app).get(`/api/v1/shows/${showId}/seats`);
