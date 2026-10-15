@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M1 done (accounts and catalog); M2 (seat holds) next.** Only what is listed under "What works today" is built. Everything
+> **Status: M2 in progress (seat holds).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
@@ -15,6 +15,9 @@ async processing and distributed rate limiting.
   replicas through Redis (and kept in Postgres), `user` and `admin` roles
 - Catalog: admins manage theatres, screens with seat layouts, movies and shows; anyone can
   browse what is playing in a city on a date and see a show's seat map
+- Seat holds: up to 5 seats for 5 minutes, all or nothing, safe under contention across replicas
+  (200 simultaneous buyers for one seat produce exactly one winner, proven by test), with
+  idempotent retries
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, plus integration tests against real Postgres and Redis containers

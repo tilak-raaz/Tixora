@@ -9,6 +9,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 - `0004_bookings.sql`: `bookings`, `booking_seats` and `idempotency_keys`; `show_seats.booking_id` records which booking holds or owns a seat
 - Database rules, each with a test: a held seat has a booking and an expiry, a booked seat has a booking, a free seat has neither; one pending booking per user per show
+- `POST /api/v1/bookings`: holds up to 5 seats for 5 minutes in one conditional `UPDATE`, all or nothing; 409 `SEATS_UNAVAILABLE` names the seats that were taken
+- `Idempotency-Key` required on holds: a retry gets the first response back (`Idempotent-Replayed: true`); a key reused for a different request is refused; a failed request can be retried with its key
+- One active hold per user per show (409 `ACTIVE_HOLD_EXISTS`); a hold that has run out never blocks its owner or other buyers
+- `GET /api/v1/bookings/:id` (owner only) and `DELETE /api/v1/bookings/:id/hold`
+- `HOLD_TTL_SECONDS` and `MAX_SEATS_PER_BOOKING` settings
+- Concurrency tests: the naive read-then-write double booking reproduced; 200 buyers over 3 replicas get exactly one winner; overlapping multi-seat holds never split
 
 ## [0.2.0] - 2026-10-15
 

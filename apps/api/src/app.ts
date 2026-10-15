@@ -6,6 +6,8 @@ import { notFoundHandler } from './middleware/not-found';
 import { requestLogger } from './middleware/request-logger';
 import type { Auth } from './modules/auth/auth';
 import { authRouter } from './modules/auth/routes';
+import { bookingRouter } from './modules/booking/routes';
+import type { BookingConfig } from './modules/booking/service';
 import { adminCatalogRouter, catalogRouter } from './modules/catalog/routes';
 import { healthRouter } from './routes/health';
 
@@ -14,6 +16,8 @@ export interface AppDeps {
   pool: Pool;
   redis: Redis;
   auth: Auth;
+  /** Hold length and seat limit; defaults to 5 minutes and 5 seats. */
+  booking?: BookingConfig;
 }
 
 /**
@@ -41,6 +45,7 @@ export function createApp(deps: AppDeps): Express {
   const v1 = Router();
   v1.use(authRouter(deps));
   v1.use(catalogRouter(deps));
+  v1.use(bookingRouter(deps));
   v1.use('/admin', adminCatalogRouter(deps));
   app.use('/api/v1', v1);
 
