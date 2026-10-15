@@ -19,6 +19,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `redis` became the default after the benchmark: under contention it cut median hold latency from about 190 ms to 7 ms, and it costs nothing without contention
 - The Redis strategy turns losers away before they touch Postgres, never decides ownership, and falls back to Postgres alone if Redis is down
 - `make bench`: benchmarks the three strategies in a throwaway database, checks invariants after every run, and writes `docs/benchmarks/m2-hold-strategies.md`
+- Hold expiry (ADR 0006): the API queues a BullMQ delayed job per hold (`hold-expiry`, job id = booking id); the worker expires the booking and frees its seats, leaving paid, cancelled and re-held seats alone
+- A sweeper in every worker releases holds whose job was lost, at start-up and every 30 s, in `SKIP LOCKED` batches so several workers never release the same hold twice
+- Queueing the expiry job never fails or slows a hold for more than 1 s when Redis is down; the sweeper catches it later
+- `packages/jobs` (`@bmt/jobs`): queue names, payloads and SQL shared by the API (producer) and worker (consumer)
+- Worker settings `HOLD_EXPIRY_CONCURRENCY`, `HOLD_SWEEP_INTERVAL_MS`, `HOLD_SWEEP_BATCH_SIZE`
 
 ## [0.2.0] - 2026-10-15
 
