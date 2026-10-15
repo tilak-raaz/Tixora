@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@bmt/payments": "*",
     "@bmt/platform": "*",
     "bullmq": "^6.3.15"
   }

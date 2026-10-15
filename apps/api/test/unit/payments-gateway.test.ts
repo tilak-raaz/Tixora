@@ -108,6 +108,68 @@ describe('razorpay gateway', () => {
   });
 });
 
+describe('razorpay gateway: refunds and order payments', () => {
+  it('refunds in full with our refund id as the receipt', async () => {
+    const { sent, fakeFetch } = scriptedFetch(200, {
+      id: 'rfnd_1',
+      payment_id: 'pay_1',
+      amount: 40_000,
+      status: 'pending',
+      receipt: 'refund-1',
+    });
+    const refund = await createRazorpayGateway({ ...KEYS, fetch: fakeFetch }).refundPayment({
+      paymentId: 'pay_1',
+      amountPaise: 40_000,
+      receipt: 'refund-1',
+    });
+
+    expect(refund).toEqual({
+      id: 'rfnd_1',
+      paymentId: 'pay_1',
+      amountPaise: 40_000,
+      status: 'pending',
+      receipt: 'refund-1',
+    });
+    expect(sent[0]!.url).toBe('https://api.razorpay.com/v1/payments/pay_1/refund');
+    expect(JSON.parse(String(sent[0]!.init.body))).toMatchObject({
+      amount: 40_000,
+      speed: 'normal',
+      receipt: 'refund-1',
+    });
+  });
+
+  it("lists an order's payments with times as dates", async () => {
+    const { sent, fakeFetch } = scriptedFetch(200, {
+      count: 1,
+      items: [
+        {
+          id: 'pay_1',
+          order_id: 'order_1',
+          amount: 40_000,
+          currency: 'INR',
+          status: 'captured',
+          created_at: 1_760_000_000,
+        },
+      ],
+    });
+    const payments = await createRazorpayGateway({ ...KEYS, fetch: fakeFetch }).listOrderPayments(
+      'order_1',
+    );
+
+    expect(sent[0]!.url).toBe('https://api.razorpay.com/v1/orders/order_1/payments');
+    expect(payments).toEqual([
+      {
+        id: 'pay_1',
+        orderId: 'order_1',
+        amountPaise: 40_000,
+        currency: 'INR',
+        status: 'captured',
+        createdAt: new Date(1_760_000_000_000),
+      },
+    ]);
+  });
+});
+
 describe('signatures', () => {
   it('accepts the checkout signature for this order and payment only', () => {
     const signature = checkoutSignature('order_1', 'pay_1', 'secret');

@@ -1,4 +1,9 @@
-import { createHoldExpiryQueue, createHoldExpiryScheduler } from '@bmt/jobs';
+import {
+  createHoldExpiryQueue,
+  createHoldExpiryScheduler,
+  createRefundQueue,
+  createRefundScheduler,
+} from '@bmt/jobs';
 import { createRazorpayGateway } from '@bmt/payments';
 import {
   createLogger,
@@ -36,6 +41,8 @@ if (!razorpay)
 
 const holdExpiryQueue = createHoldExpiryQueue(config.REDIS_URL);
 holdExpiryQueue.on('error', (err) => logger.error({ err }, 'hold expiry queue error'));
+const refundQueue = createRefundQueue(config.REDIS_URL);
+refundQueue.on('error', (err) => logger.error({ err }, 'refund queue error'));
 
 const app = createApp({
   logger,
@@ -46,6 +53,7 @@ const app = createApp({
   holdExpiry: createHoldExpiryScheduler(holdExpiryQueue, logger),
   paymentGateway: razorpay ? createRazorpayGateway(razorpay) : undefined,
   paymentWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
+  refunds: createRefundScheduler(refundQueue, logger),
   devPages: config.NODE_ENV === 'development',
 });
 
@@ -66,6 +74,6 @@ installProcessHandlers({
       server.close((err) => (err ? reject(err) : resolve()));
     });
     // 2. Only then close the connections those requests were using.
-    await Promise.all([pool.end(), redis.quit(), holdExpiryQueue.close()]);
+    await Promise.all([pool.end(), redis.quit(), holdExpiryQueue.close(), refundQueue.close()]);
   },
 });

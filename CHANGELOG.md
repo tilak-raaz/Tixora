@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 ### Added
 
 - `0005_payments.sql`: `payment_orders`, `payments`, `refunds` and `payment_webhook_events`
+- Refunds reach Razorpay: a BullMQ job per refund, queued after the transaction that records it and retried with backoff; our refund id is the Razorpay receipt, so a retry finds the first refund instead of making a second; a sweeper re-queues refunds still `PENDING`; `refund.processed` and `refund.failed` webhooks settle them, and a settled refund never changes again
+- Reconciler in the worker: asks Razorpay about unconfirmed orders (1 minute to 24 hours old, each at most every 10 minutes, claimed with `SKIP LOCKED` so workers split them) and applies captured payments through the same confirm-or-refund code as the webhook
+- `0006_payment_reconcile.sql`: `payment_orders.checked_at`
+- Worker settings `REFUND_SWEEP_INTERVAL_MS`, `RECONCILE_INTERVAL_MS`; the worker reads the Razorpay keys and runs refunds and the reconciler only when they are set
 - `POST /webhooks/razorpay` (ADR 0007): signature checked on the raw body; each event stored once by `X-Razorpay-Event-Id`, in the same transaction that acts on it, so redeliveries change nothing
 - Confirm transaction: with the booking locked, a captured payment confirms it only while the hold is active and every seat is still held by it; seats become `BOOKED` and the booking `CONFIRMED` in one commit
 - Late, duplicate and wrong-amount payments are recorded and refunded in full (`HOLD_ENDED`, `DUPLICATE_PAYMENT`, `AMOUNT_MISMATCH`), never applied; one payment reported by both `payment.captured` and `order.paid` is applied once

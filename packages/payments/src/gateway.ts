@@ -1,8 +1,7 @@
 /**
  * What the app needs from a payment provider. Razorpay implements it for real
  * (razorpay.ts); an in-memory fake implements it for tests (fake.ts), so no
- * test ever calls Razorpay. M3's later PRs add fetching an order's payments
- * (the reconciler) and refunds.
+ * test ever calls Razorpay.
  */
 
 export interface GatewayOrder {
@@ -26,6 +25,33 @@ export interface CheckoutSignatureInput {
   signature: string;
 }
 
+export interface GatewayPayment {
+  id: string;
+  orderId: string | null;
+  amountPaise: number;
+  currency: string;
+  /** created, authorized, captured, refunded or failed. Only captured money is ours to apply. */
+  status: string;
+  createdAt: Date;
+}
+
+export type GatewayRefundStatus = 'pending' | 'processed' | 'failed';
+
+export interface GatewayRefund {
+  id: string;
+  paymentId: string;
+  amountPaise: number;
+  status: GatewayRefundStatus;
+  receipt: string | null;
+}
+
+export interface RefundInput {
+  paymentId: string;
+  amountPaise: number;
+  /** Our refund id: Razorpay refuses a second refund with the same receipt. */
+  receipt: string;
+}
+
 export interface PaymentGateway {
   /** The public key id; the browser's checkout needs it, so it is not a secret. */
   readonly keyId: string;
@@ -41,6 +67,11 @@ export interface PaymentGateway {
    * webhook does).
    */
   verifyCheckoutSignature(input: CheckoutSignatureInput): boolean;
+  /** Every payment made against an order: what the reconciler asks when a webhook never came. */
+  listOrderPayments(orderId: string): Promise<GatewayPayment[]>;
+  refundPayment(input: RefundInput): Promise<GatewayRefund>;
+  /** A payment's refunds: how a retry finds the refund an earlier attempt already made. */
+  listRefunds(paymentId: string): Promise<GatewayRefund[]>;
 }
 
 /** Razorpay could not be reached, timed out, or refused the request. */

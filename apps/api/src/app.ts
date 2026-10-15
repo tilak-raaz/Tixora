@@ -1,4 +1,4 @@
-import type { HoldExpiryScheduler } from '@bmt/jobs';
+import type { HoldExpiryScheduler, RefundScheduler } from '@bmt/jobs';
 import type { PaymentGateway } from '@bmt/payments';
 import type { Logger, Pool, Redis } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
@@ -31,6 +31,8 @@ export interface AppDeps {
   payment?: PaymentConfig;
   /** Verifies Razorpay webhooks; without it /webhooks/razorpay answers 503. */
   paymentWebhookSecret?: string;
+  /** Queues refunds the webhook records; without it the worker's refund sweeper still sends them. */
+  refunds?: RefundScheduler;
   /** Serves /dev/checkout. Development only. */
   devPages?: boolean;
 }

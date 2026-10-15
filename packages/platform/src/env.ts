@@ -13,6 +13,31 @@ export const baseEnvSchema = z.object({
 
 export type BaseEnv = z.output<typeof baseEnvSchema>;
 
+/** An optional variable where an empty value in .env (KEY=) means "not set". */
+export function optionalEnv<S extends z.ZodType>(schema: S) {
+  return z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
+}
+
+/** Razorpay keys, shared by the API and the worker. Both or neither. */
+export const razorpayEnvShape = {
+  RAZORPAY_KEY_ID: optionalEnv(
+    z.string().regex(/^rzp_(test|live)_/, 'must start with rzp_test_ or rzp_live_'),
+  ),
+  RAZORPAY_KEY_SECRET: optionalEnv(z.string().min(1)),
+};
+
+export function razorpayKeysPaired(c: {
+  RAZORPAY_KEY_ID?: string | undefined;
+  RAZORPAY_KEY_SECRET?: string | undefined;
+}): boolean {
+  return Boolean(c.RAZORPAY_KEY_ID) === Boolean(c.RAZORPAY_KEY_SECRET);
+}
+
+export const RAZORPAY_PAIR_ISSUE = {
+  path: ['RAZORPAY_KEY_SECRET'],
+  message: 'set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither',
+};
+
 /**
  * Validates the environment against a schema. Fails fast with every problem
  * listed at once, so a misconfigured process never half-starts.
