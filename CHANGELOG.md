@@ -24,6 +24,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - Fake payment mode (`PAYMENT_GATEWAY=fake`, never in production): a test sheet with Pay and Fail; it answers like Checkout and sends a signed webhook through the real handler a moment later, so bookings are still confirmed only by the webhook
 - Ticket page (`/bookings/:id`) with the booking reference and the PDF to download, and My bookings (`/bookings`): waiting for payment, coming up, watched and not booked
 - `GET /api/v1/bookings`: the signed-in user's bookings, newest first, with their show and seats
+- Playwright end-to-end tests in CI (`make e2e`), on ports of their own with fake payments: sign up, pick seats, pay and get the ticket; a hold in one browser turning the seat taken in another, and its release freeing it, without a reload; a failed payment keeping the hold; a hold that runs out
+- README screenshots
 - Live seat updates (ADR 0013): `GET /api/v1/shows/:id/seats/events` streams seat changes as Server-Sent Events (`ready`, `seats`, `heartbeat`, `resync`)
 - Every seat change publishes the seats' state after it commits, on the show's Redis channel: holds, releases, expiry by job, sweeper or a new hold, and payments confirmed by the webhook or the reconciler
 - One Redis subscription per show per replica, dropped when its last viewer leaves; a reconnected subscription tells its viewers to resync
