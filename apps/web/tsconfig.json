@@ -5,13 +5,21 @@
     "types": ["node", "react", "react-dom"],
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./src/*"] }
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
     "next-env.d.ts",
     "src",
     "test",
+    "playwright.config.ts",
+    "e2e",
     "next.config.ts",
     "vitest.config.ts",
     ".next/types/**/*.ts",

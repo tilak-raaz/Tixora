@@ -3,3 +3,6 @@ package-lock.json
 coverage
 dist
 .next
+.next-e2e
+test-results
+playwright-report

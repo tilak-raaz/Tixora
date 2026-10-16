@@ -1,7 +1,7 @@
 COMPOSE = docker compose -f infra/docker-compose.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web test test-unit test-integration lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web test test-unit test-integration e2e lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -63,6 +63,9 @@ test-unit: ## Run unit tests only
 
 test-integration: ## Run integration tests only
 	npm run test:integration
+
+e2e: ## Browser tests with Playwright: web + API on ports 3100/4100, fake payments (needs make up migrate seed)
+	npm run e2e
 
 lint: ## Lint the whole repo
 	npm run lint

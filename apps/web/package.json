@@ -10,7 +10,8 @@
     "start": "next start --port 3000",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@bmt/shared": "*",
@@ -20,9 +21,12 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@tailwindcss/postcss": "^4.1.0",
+    "@types/pg": "^8.15.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "pg": "^8.16.0",
     "tailwindcss": "^4.1.0"
   }
 }

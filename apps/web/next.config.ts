@@ -4,7 +4,11 @@ import type { NextConfig } from 'next';
 const apiUrl = process.env.API_URL ?? 'http://localhost:4000';
 
 const nextConfig: NextConfig = {
+  // The end-to-end tests build into their own folder, so they can run beside `next dev`.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   reactStrictMode: true,
+  // The floating Next.js badge in development; off so screenshots show only the app.
+  devIndicators: false,
   poweredByHeader: false,
   // @bmt/shared ships TypeScript source.
   transpilePackages: ['@bmt/shared'],

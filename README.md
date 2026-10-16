@@ -35,9 +35,20 @@ async processing and distributed rate limiting.
   else stays open
 - Catalog cache in Redis (60 s), cleared on every replica at once by any admin write; the seat map
   is always live
+- A web app (Next.js): browse by city and date, pick seats on a live seat map (seats others take
+  turn taken within a second, on any replica, over Server-Sent Events fed by Redis pub/sub), hold
+  them with a 5-minute countdown, pay (Razorpay, or a fake mode for development), and get the
+  ticket; My bookings lists the rest
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
-- Unit tests, plus integration tests against real Postgres and Redis containers
+- Unit tests, integration tests against real Postgres and Redis containers, and Playwright browser
+  tests of the whole journey (including two browsers watching each other's holds)
+
+## Screens
+
+| Now showing                        | A movie                              | Live seat map                              | Held, 5:00 to pay                          | The ticket                             |
+| ---------------------------------- | ------------------------------------ | ------------------------------------------ | ------------------------------------------ | -------------------------------------- |
+| ![Home](docs/screenshots/home.jpg) | ![Movie](docs/screenshots/movie.jpg) | ![Seat map](docs/screenshots/seat-map.jpg) | ![Checkout](docs/screenshots/checkout.jpg) | ![Ticket](docs/screenshots/ticket.jpg) |
 
 ## Stack
 
@@ -59,6 +70,7 @@ make dev-api     # http://localhost:4000/readyz
 make dev-worker  # hold expiry (second terminal)
 make dev-web     # http://localhost:3000 (third terminal)
 make test        # unit + integration (starts its own containers)
+make e2e         # browser tests (Playwright, fake payments; needs make up migrate seed)
 ```
 
 `make help` lists every target. Full setup notes: [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md).
