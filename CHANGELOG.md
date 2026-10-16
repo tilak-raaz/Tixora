@@ -9,7 +9,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 - Transactional outbox (ADR 0008): `0007_outbox.sql` adds `outbox` and `processed_messages`; confirming a booking writes `booking.confirmed` and recording a refund writes `refund.recorded`, in the same transaction, with the HTTP request id
 - Outbox relay in the worker: locks unpublished events with `FOR UPDATE SKIP LOCKED`, queues each to its queues under the outbox id as the job id, and marks it published; several relays split the work, and a relay that dies mid-batch causes no duplicate job
-- `email` queue (consumer in the next change); `refund.recorded` feeds both the refund queue and the email queue
+- `email` queue; `refund.recorded` feeds both the refund queue and the email queue
+- Emails (ADR 0009): "Booking confirmed" (show, seats, total, reference) and "Refund on its way" (amount and the reason in plain words), read from Postgres when sent, with names escaped in HTML
+- `Mailer` with three implementations: SMTP via Nodemailer to Mailpit in development, Resend's HTTP API in production, and a fake for tests
+- Each email is sent once per event: `processed_messages` skips finished messages, and the outbox id is the provider's idempotency key, so a send repeated after a crash is dropped
+- Worker settings `MAILER`, `SMTP_URL`, `RESEND_API_KEY`, `EMAIL_FROM`
 - Worker setting `OUTBOX_RELAY_INTERVAL_MS` (default 500)
 - Tests: rolled-back changes leave no event; two relays at once queue each event exactly once; a relay killed between queuing and committing leaves one job; events survive a Redis outage
 
