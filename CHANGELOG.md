@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-16
+
+M5: rate limiting and caching.
+
 ### Added
 
 - Distributed rate limiting (ADR 0010): each check is one Lua script in Redis using Redis's own clock, so every replica shares one budget per key
@@ -12,12 +16,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` headers; `429 RATE_LIMITED` with `Retry-After`; webhooks are never limited
 - When Redis is down: sign-in and sign-up refuse with 503 (fail closed); every other route stays open
 - Setting `RATE_LIMIT_ENABLED` (default true)
+- Tests: bucket burst, refill and per-subject budgets, 50 simultaneous checks against a capacity of 10, sliding-window edges, both failure modes, and three replicas allowing exactly 10 of 30 holds
 - Catalog cache (ADR 0011): cities, movies in a city, a movie, a movie's shows and a show are read through Redis for 60 s, with `X-Cache: HIT | MISS | BYPASS`; the seat map is never cached
 - Invalidation by version: every admin catalog write increments the catalog version before answering, so every replica's next read is fresh; nothing has to be found and deleted
 - Concurrent misses for one key load it once per replica; Redis down or slower than 100 ms falls back to Postgres
 - Setting `CATALOG_CACHE_TTL_SECONDS` (default 60, 0 turns the cache off)
 - Tests: hit after miss, TTL expiry, seat map and 404s never cached, an admin write on one replica seen on another, a refused write leaving the cache alone, 20 concurrent misses loading once, Redis down and Redis slow
-- Tests: bucket burst, refill and per-subject budgets, 50 simultaneous checks against a capacity of 10, sliding-window edges, both failure modes, and three replicas allowing exactly 10 of 30 holds
 
 ## [0.5.0] - 2026-10-16
 
@@ -130,7 +134,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/tilak-raaz/Tixora/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tilak-raaz/Tixora/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tilak-raaz/Tixora/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tilak-raaz/Tixora/compare/v0.2.0...v0.3.0
