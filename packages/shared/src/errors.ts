@@ -22,6 +22,8 @@ export const ERROR_CODES = [
   'HOLD_ENDING_SOON',
   'PAYMENT_GATEWAY_ERROR',
   'PAYMENT_SIGNATURE_INVALID',
+  // Tickets
+  'BOOKING_NOT_CONFIRMED',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

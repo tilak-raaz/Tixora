@@ -6,3 +6,4 @@ export * from './email';
 export * from './outbox-relay';
 export * from './mailer';
 export * from './email-content';
+export * from './ticket';

@@ -1,4 +1,5 @@
 import type { HoldExpiryScheduler } from '@bmt/jobs';
+import { loadBookingDetails, renderTicketPdf, ticketFilename } from '@bmt/jobs';
 import type { Logger, Pool, Redis } from '@bmt/platform';
 import { Router } from 'express';
 import { AppError } from '../../lib/errors';
@@ -68,6 +69,26 @@ export function bookingRouter(deps: {
   router.get('/bookings/:id', signedIn, async (req, res) => {
     const { id } = parseParams(bookingIdParam, req);
     res.json({ booking: await bookings.get(req.auth!.user.id, id) });
+  });
+
+  /** The ticket as a PDF, rendered from the booking. Only for the owner of a confirmed booking. */
+  router.get('/bookings/:id/ticket', signedIn, async (req, res) => {
+    const { id } = parseParams(bookingIdParam, req);
+    const booking = await bookings.get(req.auth!.user.id, id); // 404 for anyone else's
+    if (booking.status !== 'CONFIRMED') {
+      throw new AppError(
+        409,
+        'BOOKING_NOT_CONFIRMED',
+        'A ticket exists only for a confirmed booking',
+      );
+    }
+    const details = (await loadBookingDetails(deps.pool, id))!;
+    const pdf = await renderTicketPdf(details);
+    res
+      .type('application/pdf')
+      .set('Content-Disposition', `attachment; filename="${ticketFilename(id)}"`)
+      .set('Cache-Control', 'private, no-store')
+      .send(pdf);
   });
 
   router.delete('/bookings/:id/hold', signedIn, async (req, res) => {
