@@ -3,6 +3,21 @@
 Bugs found, surprises, and what each one taught. Newest first. These become the stories for
 interviews, so record the symptom, the cause, the fix, and how a test now guards it.
 
+## 2026-10-17 · Healthy is not the same as ready to be timed
+
+- **Symptom:** the first Playwright test through nginx failed right after `make stack-e2e`
+  rebuilt the stack: sign-up took 12 s against a 10 s limit. The other three tests passed, and
+  the same sign-up took 200 ms a minute later.
+- **Cause:** not what it looked like. nginx's access log (which replica answered, and how long it
+  took) showed every request going to a live replica, so stale addresses were ruled out.
+  Restarting and then recreating the replicas and timing them straight away showed them fast
+  from the first request, so slow cold replicas were ruled out too. For about 30 s every replica
+  was slow at once, while the laptop was still finishing the image build, compiling a seed run
+  and starting Chromium: the containers were healthy but starved of CPU.
+- **Fix:** `make stack-warm` waits until the stack answers five rounds in a row under 0.5 s
+  before tests or load runs start. The app did not change; the measurement did.
+- **Guarded by:** `make stack-e2e` and the CI stack job run it before Playwright.
+
 ## 2026-10-15 · The benchmark overturned the default
 
 - **Symptom:** with 300 buyers on one seat, the "simple" Postgres-only strategy made every buyer

@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Full stack in containers (ADR 0014): `make stack` starts nginx at http://localhost:8080 in front of 3 API replicas, 2 workers and the Next.js server, after a one-shot `migrate` job, on the same Postgres and Redis as `make up`. `DEMO=1` adds fake payments; otherwise the containers run as production
+- nginx: `least_conn` across the replicas found through Docker's DNS (so seat streams count and restarted replicas are followed), unbuffered seat streams, a request ID passed to the API, JSON access logs naming the replica, the client address set at the edge and carried through server rendering on an internal port
+- Images: one server image for the API, worker and scripts (production dependencies, run through tsx), and the web app as a Next.js standalone server
+- `make stack-e2e` and a CI job: the Playwright suite through nginx against the built images
+- `make stack-warm` (`infra/scripts/warm-up.sh`): waits until the stack answers at normal speed, not just healthy, before tests and load runs
+- Web: `/healthz` for the container health check
+
+### Changed
+
+- `make down` and `make reset` also stop the full stack's containers
+
 ## [0.7.0] - 2026-10-17
 
 M6: the web app, with live seat maps.
