@@ -2,7 +2,8 @@ import type { Logger, Pool } from '@bmt/platform';
 import { Queue, Worker } from 'bullmq';
 import { QUEUE_PREFIX, queueConnection, type QueueOptions } from './connection';
 import { bookingConfirmedEmail, loadBookingDetails, refundRecordedEmail } from './email-content';
-import type { Mailer } from './mailer';
+import type { EmailMessage, Mailer } from './mailer';
+import { renderTicketPdf, ticketFilename } from './ticket';
 
 /**
  * The email queue. The relay fills it from the outbox; its consumer sends the
@@ -66,10 +67,18 @@ export async function handleEmailJob(
 
   const details = await loadBookingDetails(pool, bookingId);
   let email;
+  let attachments: EmailMessage['attachments'];
   if (!details) {
     email = undefined;
   } else if (job.name === 'booking-confirmed') {
     email = bookingConfirmedEmail(details);
+    attachments = [
+      {
+        filename: ticketFilename(bookingId),
+        content: await renderTicketPdf(details),
+        contentType: 'application/pdf',
+      },
+    ];
   } else {
     const { rows } = await pool.query<{ amountPaise: number; reason: string }>(
       'SELECT amount_paise AS "amountPaise", reason FROM refunds WHERE id = $1',
@@ -79,7 +88,7 @@ export async function handleEmailJob(
   }
 
   if (email) {
-    await mailer.send({ to: details!.userEmail, ...email, idempotencyKey: outboxId });
+    await mailer.send({ to: details!.userEmail, ...email, attachments, idempotencyKey: outboxId });
   } else {
     log.warn('nothing to email about: booking or refund not found');
   }

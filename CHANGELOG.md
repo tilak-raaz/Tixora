@@ -11,6 +11,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - Outbox relay in the worker: locks unpublished events with `FOR UPDATE SKIP LOCKED`, queues each to its queues under the outbox id as the job id, and marks it published; several relays split the work, and a relay that dies mid-batch causes no duplicate job
 - `email` queue; `refund.recorded` feeds both the refund queue and the email queue
 - Emails (ADR 0009): "Booking confirmed" (show, seats, total, reference) and "Refund on its way" (amount and the reason in plain words), read from Postgres when sent, with names escaped in HTML
+- PDF ticket (A6, QR code with the booking id, show, seats, amount, reference), rendered from the booking with PDFKit and attached to the confirmation email; never stored, so it always matches the booking
+- `GET /api/v1/bookings/:id/ticket`: the ticket for the owner of a confirmed booking (409 `BOOKING_NOT_CONFIRMED` otherwise, 404 for anyone else's)
 - `Mailer` with three implementations: SMTP via Nodemailer to Mailpit in development, Resend's HTTP API in production, and a fake for tests
 - Each email is sent once per event: `processed_messages` skips finished messages, and the outbox id is the provider's idempotency key, so a send repeated after a crash is dropped
 - Worker settings `MAILER`, `SMTP_URL`, `RESEND_API_KEY`, `EMAIL_FROM`

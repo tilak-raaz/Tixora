@@ -88,7 +88,7 @@ export function bookingConfirmedEmail(d: BookingDetails): RenderedEmail {
       `Paid: ${formatPaise(d.totalPaise)}`,
       `Booking reference: ${ref}`,
       '',
-      'Show the attached ticket at the entrance.',
+      'Show the attached ticket at the entrance. You can download it again from your bookings.',
     ].join('\n'),
     html: layout(`
       <p>Hi ${esc(d.userName)},</p>
@@ -102,7 +102,7 @@ export function bookingConfirmedEmail(d: BookingDetails): RenderedEmail {
         ${row('Paid', esc(formatPaise(d.totalPaise)))}
         ${row('Booking reference', `<strong>${esc(ref)}</strong>`)}
       </table>
-      <p>Show the attached ticket at the entrance.</p>`),
+      <p>Show the attached ticket at the entrance. You can download it again from your bookings.</p>`),
   };
 }
 
