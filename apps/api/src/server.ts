@@ -8,6 +8,7 @@ import {
   loadEnvFile,
 } from '@bmt/platform';
 import { createApp } from './app';
+import { createCache } from './lib/cache';
 import { DEFAULT_RATE_LIMITS } from './lib/rate-limit';
 import { authConfigFrom, bookingConfigFrom, loadConfig, razorpayConfigFrom } from './config';
 import { createAuth } from './modules/auth/auth';
@@ -49,6 +50,10 @@ const app = createApp({
   paymentWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
   devPages: config.NODE_ENV === 'development',
   rateLimits: config.RATE_LIMIT_ENABLED ? { policies: DEFAULT_RATE_LIMITS } : undefined,
+  cache:
+    config.CATALOG_CACHE_TTL_SECONDS > 0
+      ? createCache(redis, logger, { ttlSeconds: config.CATALOG_CACHE_TTL_SECONDS })
+      : undefined,
 });
 
 const server = app.listen(config.PORT, (err?: Error) => {

@@ -4,6 +4,7 @@ import type { Logger, Pool, Redis } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
 import { devRouter } from './dev/routes';
+import type { Cache } from './lib/cache';
 import {
   createRateLimiter,
   NO_LIMITS,
@@ -45,6 +46,8 @@ export interface AppDeps {
    * the limiter defaults to one on `redis`.
    */
   rateLimits?: { policies: RateLimitPolicies; limiter?: RateLimiter };
+  /** Catalog read cache; without it every read goes to Postgres (most tests). */
+  cache?: Cache;
 }
 
 /**
@@ -91,7 +94,7 @@ export function createApp(deps: AppDeps): Express {
   v1.use(catalogRouter(routerDeps));
   v1.use(bookingRouter(routerDeps));
   v1.use(paymentRouter(routerDeps));
-  v1.use('/admin', adminCatalogRouter(deps));
+  v1.use('/admin', adminCatalogRouter(routerDeps));
   app.use('/api/v1', v1);
   if (deps.devPages) app.use(devRouter());
 

@@ -32,6 +32,8 @@ export const apiEnvSchema = baseEnvSchema
     MAX_SEATS_PER_BOOKING: z.coerce.number().int().min(1).max(20).default(5),
     /** How seats are taken: redis (default), conditional or pessimistic (ADR 0005). */
     HOLD_STRATEGY: z.enum(HOLD_STRATEGIES).default('redis'),
+    /** How long catalog reads stay cached; 0 turns the cache off (ADR 0011). */
+    CATALOG_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
     /** Per-route rate limits (ADR 0010). Turn off only for local load experiments. */
     RATE_LIMIT_ENABLED: z
       .enum(['true', 'false'])
