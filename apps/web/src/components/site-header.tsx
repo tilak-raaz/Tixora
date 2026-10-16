@@ -1,25 +1,42 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { SITE_NAME } from '@/lib/site';
+import { CityPicker } from './city-picker';
+import { Container } from './container';
 import { LogoMark } from './logo-mark';
 import { Button, ButtonLink } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { useToast } from './ui/toast';
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  cities: { slug: string; name: string }[];
+  rememberedCity: string | undefined;
+}
+
+export function SiteHeader({ cities, rememberedCity }: SiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-card/90 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
+    <header className="sticky top-0 z-30 border-b border-line bg-card">
+      <Container className="flex h-16 items-center justify-between gap-3">
+        <Link href="/" className="flex items-center gap-2.5" aria-label={`${SITE_NAME} home`}>
           <LogoMark />
-          <span className="font-display text-lg font-extrabold tracking-tight">{SITE_NAME}</span>
+          <span className="hidden font-display text-[1.6rem] leading-none tracking-wide uppercase min-[380px]:block">
+            {SITE_NAME}
+          </span>
         </Link>
-        <Account />
-      </div>
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          {cities.length > 0 && (
+            // useSearchParams needs a Suspense boundary on statically rendered pages.
+            <Suspense fallback={<Skeleton className="h-9 w-28" />}>
+              <CityPicker cities={cities} remembered={rememberedCity} />
+            </Suspense>
+          )}
+          <Account />
+        </div>
+      </Container>
     </header>
   );
 }
@@ -28,13 +45,15 @@ function Account() {
   const { data: session, isPending } = authClient.useSession();
   const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
 
-  if (isPending) return <Skeleton className="h-9 w-24 rounded-full" />;
+  if (isPending) return <Skeleton className="h-9 w-20" />;
 
   if (!session) {
+    if (pathname === '/login' || pathname === '/signup') return null;
     return (
-      <ButtonLink href="/login" variant="secondary" size="sm">
+      <ButtonLink href={`/login?next=${encodeURIComponent(pathname)}`} variant="dark" size="sm">
         Sign in
       </ButtonLink>
     );
@@ -56,11 +75,11 @@ function Account() {
     <div className="flex items-center gap-2">
       <span
         aria-hidden
-        className="flex size-9 items-center justify-center rounded-full bg-ink font-display text-sm font-bold text-white"
+        className="flex size-9 items-center justify-center rounded-md bg-ink font-display text-lg text-white"
       >
         {name.charAt(0).toUpperCase()}
       </span>
-      <span className="hidden max-w-40 truncate text-sm font-semibold sm:block">{name}</span>
+      <span className="hidden max-w-36 truncate text-sm font-semibold md:block">{name}</span>
       <Button variant="ghost" size="sm" onClick={signOut} loading={signingOut}>
         Sign out
       </Button>

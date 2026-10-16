@@ -1,13 +1,21 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Manrope } from 'next/font/google';
+import { Anton, Schibsted_Grotesk } from 'next/font/google';
+import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/site-header';
 import { ToastProvider } from '@/components/ui/toast';
+import { getCities, type City } from '@/lib/catalog';
+import { CITY_COOKIE_NAME } from '@/lib/city';
 import { SITE_DESCRIPTION, SITE_NAME } from '@/lib/site';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
-const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', display: 'swap' });
+const body = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-body', display: 'swap' });
+const marquee = Anton({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-marquee',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
@@ -15,16 +23,30 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#c8102e',
+  themeColor: '#ffffff',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/** The header still renders when the API is down; the page itself shows the error. */
+async function headerCities(): Promise<City[]> {
+  try {
+    return await getCities();
+  } catch {
+    return [];
+  }
+}
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const [cities, jar] = await Promise.all([headerCities(), cookies()]);
+
   return (
-    <html lang="en-IN" className={`${inter.variable} ${manrope.variable}`}>
+    <html lang="en-IN" className={`${body.variable} ${marquee.variable}`}>
       <body className="min-h-dvh bg-surface font-sans text-ink antialiased">
         <ToastProvider>
-          <SiteHeader />
-          <main className="mx-auto w-full max-w-5xl px-4 pt-6 pb-16 sm:px-6">{children}</main>
+          <SiteHeader
+            cities={cities.map(({ slug, name }) => ({ slug, name }))}
+            rememberedCity={jar.get(CITY_COOKIE_NAME)?.value}
+          />
+          <main className="pb-20">{children}</main>
         </ToastProvider>
       </body>
     </html>

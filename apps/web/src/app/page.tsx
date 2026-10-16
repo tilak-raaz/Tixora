@@ -1,50 +1,75 @@
-const STEPS = [
-  { title: 'Pick a show', body: 'Choose a city, a movie and a time that suits you.' },
-  { title: 'Choose your seats', body: 'Up to 5 seats, held for you for 5 minutes while you pay.' },
-  { title: 'Pay and go', body: 'Your ticket, with a QR code, arrives by email and stays here.' },
-];
+import { cookies } from 'next/headers';
+import { Container } from '@/components/container';
+import { DateStrip } from '@/components/date-strip';
+import { EmptyState } from '@/components/empty-state';
+import { MovieCard } from '@/components/movie-card';
+import { getCities, getMoviesInCity } from '@/lib/catalog';
+import { CITY_COOKIE_NAME, pickCity } from '@/lib/city';
+import { dateHeadline, firstParam, isIsoDate, nextDays, todayIn } from '@/lib/format';
 
-export default function HomePage() {
+/** How many days ahead the date strip offers. The seed data covers a week. */
+const DAYS_AHEAD = 7;
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const cities = await getCities();
+  const city = pickCity(
+    cities,
+    firstParam(params.city),
+    (await cookies()).get(CITY_COOKIE_NAME)?.value,
+  );
+
+  if (!city) {
+    return (
+      <Container className="pt-10">
+        <EmptyState title="No cities yet">
+          Load the demo catalog with <code>make seed</code>, then refresh this page.
+        </EmptyState>
+      </Container>
+    );
+  }
+
+  const today = todayIn(city.timezone);
+  const dates = nextDays(today, DAYS_AHEAD);
+  const requested = firstParam(params.date);
+  const date = isIsoDate(requested) && dates.includes(requested) ? requested : today;
+  const movies = await getMoviesInCity(city.slug, date);
+  const query = (d: string) => `city=${encodeURIComponent(city.slug)}&date=${d}`;
+
   return (
-    <div className="flex flex-col gap-8">
-      <section className="relative overflow-hidden rounded-card bg-primary px-6 py-10 text-white sm:px-10 sm:py-14">
-        <div
-          aria-hidden
-          className="absolute -top-16 -right-16 size-56 rounded-full bg-white/10 sm:size-72"
-        />
-        <div
-          aria-hidden
-          className="absolute -bottom-24 right-24 size-48 rounded-full bg-white/5 sm:size-64"
-        />
-        <div className="relative max-w-xl">
-          <p className="text-sm font-semibold tracking-wide text-white/75 uppercase">
-            Movie tickets
-          </p>
-          <h1 className="mt-2 font-display text-3xl leading-tight font-extrabold sm:text-5xl">
-            The best seats go first. Get yours.
+    <Container className="flex flex-col gap-6 pt-8 sm:pt-12">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="font-display text-5xl leading-[0.9] uppercase sm:text-7xl">
+            {dateHeadline(date, today)}
+            <br />
+            in {city.name}
           </h1>
-          <p className="mt-3 text-white/80 sm:text-lg">
-            See which seats are free as it happens, and keep them while you pay.
+          <p className="mt-3 text-muted">
+            {movies.length === 1 ? '1 movie showing.' : `${movies.length} movies showing.`} Pick one
+            to see times and seats.
           </p>
         </div>
-      </section>
+        <DateStrip dates={dates} selected={date} today={today} hrefFor={(d) => `/?${query(d)}`} />
+      </div>
 
-      <section aria-labelledby="how-it-works">
-        <h2 id="how-it-works" className="font-display text-xl font-bold">
-          How it works
-        </h2>
-        <ol className="mt-4 grid gap-3 sm:grid-cols-3">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="rounded-card bg-card p-5">
-              <span className="flex size-8 items-center justify-center rounded-full bg-primary-soft font-display text-sm font-bold text-primary">
-                {index + 1}
-              </span>
-              <h3 className="mt-3 font-semibold">{step.title}</h3>
-              <p className="mt-1 text-sm text-muted">{step.body}</p>
+      {movies.length === 0 ? (
+        <EmptyState title="Nothing showing">
+          No shows in {city.name} on this day. Pick another date above.
+        </EmptyState>
+      ) : (
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+          {movies.map((movie) => (
+            <li key={movie.id}>
+              <MovieCard movie={movie} href={`/movies/${movie.id}?${query(date)}`} />
             </li>
           ))}
-        </ol>
-      </section>
-    </div>
+        </ul>
+      )}
+    </Container>
   );
 }

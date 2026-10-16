@@ -38,21 +38,21 @@ export function Sheet({ open, onClose, title, children, footer, className }: She
         if (event.target === ref.current) onClose();
       }}
       className={cn(
-        'm-0 mt-auto max-h-[85dvh] w-full max-w-none rounded-t-card bg-card p-0 text-ink',
-        'backdrop:bg-ink/50 sm:m-auto sm:max-w-md sm:rounded-card',
+        'm-0 mt-auto max-h-[85dvh] w-full max-w-none rounded-t-xl bg-card p-0 text-ink',
+        'backdrop:bg-ink/60 sm:m-auto sm:max-w-md sm:rounded-xl',
         className,
       )}
     >
       <div className="flex flex-col gap-4 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <h2 id={titleId} className="font-display text-lg font-bold">
+          <h2 id={titleId} className="font-display text-2xl uppercase">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-m-2 rounded-full p-2 text-muted hover:bg-surface hover:text-ink"
+            className="-m-2 rounded-md p-2 text-muted hover:bg-surface hover:text-ink"
           >
             <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
               <path

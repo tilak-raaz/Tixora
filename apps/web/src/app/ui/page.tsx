@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tag } from '@/components/ui/tag';
+import { Container } from '@/components/container';
+import { MoviePoster } from '@/components/movie-poster';
 import { cn } from '@/lib/cn';
 import { InteractiveDemo } from './interactive-demo';
 
@@ -35,14 +37,14 @@ export default function UiKitPage() {
   if (process.env.NODE_ENV === 'production') notFound();
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="font-display text-3xl font-extrabold">UI kit</h1>
+    <Container className="flex flex-col gap-6 pt-8">
+      <h1 className="font-display text-6xl leading-none uppercase">UI kit</h1>
 
       <Section title="Colours">
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
           {COLOURS.map(([name, swatch]) => (
             <div key={name} className="flex flex-col gap-1.5">
-              <div className={cn('h-12 rounded-xl border border-line', swatch)} />
+              <div className={cn('h-12 rounded-md border border-line', swatch)} />
               <span className="text-xs text-muted">{name}</span>
             </div>
           ))}
@@ -50,8 +52,10 @@ export default function UiKitPage() {
       </Section>
 
       <Section title="Type">
-        <p className="font-display text-4xl font-extrabold">Manrope display</p>
-        <p className="mt-2">Inter body text. Paise in, rupees out: ₹1,23,456.78</p>
+        <p className="font-display text-6xl leading-none uppercase">Anton for headlines</p>
+        <p className="mt-3">
+          Schibsted Grotesk for everything else. Paise in, rupees out: ₹1,23,456.78
+        </p>
         <p className="mt-1 text-sm text-muted">Muted secondary text</p>
       </Section>
 
@@ -82,7 +86,7 @@ export default function UiKitPage() {
         <div className="flex flex-wrap gap-5">
           {SEATS.map(([label, look]) => (
             <div key={label} className="flex items-center gap-2">
-              <span className={cn('size-7 rounded-lg', look)} />
+              <span className={cn('size-7 rounded-t-md rounded-b-sm', look)} />
               <span className="text-sm">{label}</span>
             </div>
           ))}
@@ -97,17 +101,39 @@ export default function UiKitPage() {
         </div>
       </Section>
 
+      <Section title="Posters">
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+          {[
+            'Kalinga Rising',
+            'Monsoon Express',
+            'The Last Lighthouse',
+            'Dhauli',
+            'Night Bus',
+            'Seventeen Steps',
+          ].map((title) => (
+            <MoviePoster
+              key={title}
+              title={title}
+              posterUrl={null}
+              language="Odia"
+              certificate="UA13+"
+              className="rounded-card"
+            />
+          ))}
+        </div>
+      </Section>
+
       <Section title="Sheet and toast">
         <InteractiveDemo />
       </Section>
-    </div>
+    </Container>
   );
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-card bg-card p-5 sm:p-6">
-      <h2 className="mb-4 text-sm font-semibold tracking-wide text-muted uppercase">{title}</h2>
+      <h2 className="mb-4 font-display text-2xl uppercase">{title}</h2>
       {children}
     </section>
   );
