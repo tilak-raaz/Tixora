@@ -5,33 +5,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-17
+
+M6: the web app, with live seat maps.
+
 ### Added
 
-- `apps/web`: Next.js (App Router) frontend with Tailwind CSS theme tokens (red primary, ink, surface), Manrope and Inter, and small components: button, tag, sheet, toast, skeleton (ADR 0012)
-- One origin for the browser: `/api/*` is forwarded to the API, so the session cookie is first-party and there is no CORS
-- Typed `api()` client that turns every error response into an `ApiError` carrying the API's error code and `Retry-After`; Better Auth's React client for sessions
-- `make dev-web` and `make build-web`; CI and `make check` now build the web app
-- Browse pages: now showing in a city by date (city remembered in a cookie), a movie with its shows grouped by theatre, and a show's details and prices; times are shown in the city's time zone
-- Sign-in and sign-up pages with Better Auth, returning to the page you came from (same-site paths only)
-- Ticket-stub design: movie cards, dates and show times are tickets with a perforated tear line and notched stubs; Anton for headlines and poster titles, Schibsted Grotesk for text; the city picker lives in the header
-- Typographic posters (flat palette colour, frame, rating box, title in poster type) for movies without an image; loading, empty, error and 404 states
-- Server-rendered pages pass the visitor's address to the API in `X-Forwarded-For` (last proxy entry only), so per-IP browse limits stay per visitor
-- Seat map on the show page: screen at the top, a price heading per seat category, aisles as gaps; pick up to 5 seats, hold them, and go to your seats with a 5:00 countdown (red in the last minute) and a way to release them
-- The show page and the checkout open on a ticket in the movie's poster colour, so the look of the poster carries through to the countdown
-- The map stays live: it follows seat events, reloads on reconnect, `resync` or a gap the heartbeat exposes, and a seat someone else takes flashes once; a picked seat taken by someone else is dropped with a message
-- Holding handles every answer: seats just taken (dropped, map reloaded), a hold already open for the show, rate limiting, and signing in first (the picked seats wait in the tab and come back)
-- Paying in the web app: Razorpay Checkout, then a signature check and "Confirming your booking" until the webhook confirms it (up to 30 s), then the ticket; a payment that arrives after the hold ended explains the automatic refund
-- Fake payment mode (`PAYMENT_GATEWAY=fake`, never in production): a test sheet with Pay and Fail; it answers like Checkout and sends a signed webhook through the real handler a moment later, so bookings are still confirmed only by the webhook
-- Ticket page (`/bookings/:id`) with the booking reference and the PDF to download, and My bookings (`/bookings`): waiting for payment, coming up, watched and not booked
-- `GET /api/v1/bookings`: the signed-in user's bookings, newest first, with their show and seats
-- Playwright end-to-end tests in CI (`make e2e`), on ports of their own with fake payments: sign up, pick seats, pay and get the ticket; a hold in one browser turning the seat taken in another, and its release freeing it, without a reload; a failed payment keeping the hold; a hold that runs out
+- `apps/web`: Next.js (App Router) frontend (ADR 0012). The browser only talks to its own origin: `/api/*` is forwarded to the API, so the session cookie is first-party and there is no CORS. A typed `api()` client turns every error response into an `ApiError` with the API's code and `Retry-After`
+- Design: everything is a ticket. Movie cards, dates and show times have perforated tear lines and notched stubs; the show page, checkout and ticket open on a ticket in the movie's poster colour; Anton for headlines and poster titles, Schibsted Grotesk for text, red only for actions and selection; typographic posters for movies without an image
+- Browse: what is showing in a city by date (city in the header, remembered in a cookie), a movie with its shows by theatre, a show's details; times always in the city's time zone; sign up and sign in that return to the page you came from (same-site paths only)
+- Seat map: screen at the top, a price heading per category, aisles as gaps; pick up to 5 seats and hold them; a hold already open, seats just taken, rate limits and signing in first (picks come back) are each handled
+- Live seat maps (ADR 0013): `GET /api/v1/shows/:id/seats/events` streams seat changes as Server-Sent Events. Every seat change (hold, release, expiry by job, sweeper or a new hold, payment confirmed by webhook or reconciler) publishes the seats' state after it commits on the show's Redis channel; each replica subscribes once per watched show and forwards to its viewers. The browser merges events and the snapshot by seat version; the 15 s heartbeat carries the show's seat version, so a lost event is noticed and the map reloads; a reconnected subscriber tells viewers to resync. Opening a stream counts against the browse limit, and a replica keeps at most 6 streams per IP
+- Checkout: the held seats with a 5:00 countdown (red in the last minute), Release seats, and Pay: Razorpay Checkout, then a signature check and "Confirming your booking" until the webhook confirms it (up to 30 s), then the ticket. A payment after the hold ended explains the automatic refund
+- Fake payment mode (`PAYMENT_GATEWAY=fake`, refused in production): a test sheet with Pay and Fail that answers like Checkout and sends a signed webhook through the real handler a moment later, so bookings are still confirmed only by the webhook. The worker sends no refunds in this mode
+- Ticket page (`/bookings/:id`) with the booking reference and the PDF, and My bookings (`/bookings`): waiting for payment, coming up, watched, not booked; `GET /api/v1/bookings` behind it
+- Server-rendered pages pass the visitor's address on in `X-Forwarded-For` (last proxy entry only), so per-IP limits stay per visitor
+- `make dev-web`, `make build-web` and `make e2e`; CI builds the web app and runs the browser tests
+- Tests: 12 integration tests for live seats across two replicas and a worker (a hold on one replica seen on the other within a second, worker expiry reaching both, a lost event exposed by the heartbeat, resync after the subscriber connection is killed, the stream limit, the publisher surviving an unreachable Redis); fake payments, My bookings; unit tests for the seat-map state (merge by version, heartbeat gap detection), dates and the API client; 4 Playwright tests (the whole journey to the ticket, two browsers watching each other's holds, a failed payment, a hold that runs out)
 - README screenshots
-- Live seat updates (ADR 0013): `GET /api/v1/shows/:id/seats/events` streams seat changes as Server-Sent Events (`ready`, `seats`, `heartbeat`, `resync`)
-- Every seat change publishes the seats' state after it commits, on the show's Redis channel: holds, releases, expiry by job, sweeper or a new hold, and payments confirmed by the webhook or the reconciler
-- One Redis subscription per show per replica, dropped when its last viewer leaves; a reconnected subscription tells its viewers to resync
-- The heartbeat carries the show's seat version, so a browser notices an event it never received; the seat map now includes each seat's `version`
-- Limits: opening a stream counts against the browse limit, and a replica keeps at most 6 streams open per IP
-- Tests: a hold on one replica seen on the other within a second, a release with a higher version, the worker's expiry reaching viewers on both replicas, a lost event exposed by the heartbeat, subscribe-once and unsubscribe, resync after the subscriber connection is killed, the stream limit, and the publisher surviving an unreachable Redis
+
+### Changed
+
+- The seat map includes each seat's `version`; it and the seat events share one definition of a free seat
+- Razorpay webhook handling is one function, used by the route and by the fake payment mode
 
 ### Removed
 
@@ -166,7 +162,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/tilak-raaz/Tixora/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/tilak-raaz/Tixora/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tilak-raaz/Tixora/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tilak-raaz/Tixora/compare/v0.3.0...v0.4.0
