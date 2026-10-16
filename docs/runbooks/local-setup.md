@@ -17,19 +17,24 @@ make create-admin     # admin account from ADMIN_* in .env
 make seed             # demo catalog: Rourkela, 2 theatres, a week of shows
 make dev-api         # in one terminal
 make dev-worker      # in another
+make dev-web         # in a third: http://localhost:3000
 curl localhost:4000/readyz
 ```
 
+The web app forwards `/api/*` to the API (`API_URL`, default `http://localhost:4000`), so the
+browser only ever talks to `localhost:3000`. `localhost:3000/ui` shows every UI component
+(development only).
+
 ## Everyday commands
 
-| Command                 | What it does                                |
-| ----------------------- | ------------------------------------------- |
-| `make up` / `make down` | Start or stop the containers (data is kept) |
-| `make reset`            | Delete all local data and start clean       |
-| `make psql`             | psql shell on the local database            |
-| `make redis-cli`        | redis-cli on the local Redis                |
-| `make test`             | Unit + integration tests                    |
-| `make check`            | Lint, typecheck and all tests, like CI      |
+| Command                 | What it does                                  |
+| ----------------------- | --------------------------------------------- |
+| `make up` / `make down` | Start or stop the containers (data is kept)   |
+| `make reset`            | Delete all local data and start clean         |
+| `make psql`             | psql shell on the local database              |
+| `make redis-cli`        | redis-cli on the local Redis                  |
+| `make test`             | Unit + integration tests                      |
+| `make check`            | Lint, typecheck, tests and web build, like CI |
 
 ## Trying auth by hand
 

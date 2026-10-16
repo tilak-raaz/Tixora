@@ -1,7 +1,7 @@
 COMPOSE = docker compose -f infra/docker-compose.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker test test-unit test-integration lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web test test-unit test-integration lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -49,6 +49,12 @@ dev-api: ## Run the API with reload
 dev-worker: ## Run the worker with reload
 	npm run dev:worker
 
+dev-web: ## Run the Next.js app with reload (http://localhost:3000; needs dev-api)
+	npm run dev:web
+
+build-web: ## Production build of the Next.js app
+	npm run build:web
+
 test: ## Run all tests (integration tests start their own containers)
 	npm test
 
@@ -67,4 +73,4 @@ typecheck: ## Typecheck every workspace
 format: ## Format the whole repo
 	npm run format
 
-check: lint typecheck test ## Everything CI runs
+check: lint typecheck test build-web ## Everything CI runs

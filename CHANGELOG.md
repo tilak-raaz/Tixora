@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- `apps/web`: Next.js (App Router) frontend with Tailwind CSS theme tokens (red primary, ink, surface), Manrope and Inter, and small components: button, tag, sheet, toast, skeleton (ADR 0012)
+- One origin for the browser: `/api/*` is forwarded to the API, so the session cookie is first-party and there is no CORS
+- Typed `api()` client that turns every error response into an `ApiError` carrying the API's error code and `Retry-After`; Better Auth's React client for sessions
+- `make dev-web` and `make build-web`; CI and `make check` now build the web app
+
 ## [0.6.0] - 2026-10-16
 
 M5: rate limiting and caching.

@@ -14,6 +14,8 @@
   "scripts": {
     "dev:api": "npm run dev -w @bmt/api",
     "dev:worker": "npm run dev -w @bmt/worker",
+    "dev:web": "npm run dev -w @bmt/web",
+    "build:web": "npm run build -w @bmt/web",
     "migrate": "npm run migrate -w @bmt/api",
     "create-admin": "npm run create-admin -w @bmt/api",
     "seed": "npm run seed -w @bmt/api",
@@ -29,11 +31,11 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,mjs,js}": [
+    "*.{ts,tsx,mjs,js}": [
       "eslint --fix",
       "prettier --write"
     ],
-    "*.{json,md,yml,yaml}": [
+    "*.{json,md,yml,yaml,css}": [
       "prettier --write"
     ]
   },
@@ -41,9 +43,11 @@
     "@commitlint/cli": "^19.8.0",
     "@commitlint/config-conventional": "^19.8.0",
     "@eslint/js": "^9.39.0",
+    "@next/eslint-plugin-next": "^16.1.0",
     "@types/node": "^24.0.0",
     "eslint": "^9.39.0",
     "eslint-config-prettier": "^10.1.0",
+    "eslint-plugin-react-hooks": "^7.0.0",
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.0.0",
