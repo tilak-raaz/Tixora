@@ -1,5 +1,6 @@
 import type { Pool } from '@bmt/platform';
 import { Router } from 'express';
+import { NO_LIMITS, type RouteLimits } from '../../lib/rate-limit';
 import { parseBody, parseParams, parseQuery } from '../../lib/validate';
 import type { Auth } from '../auth/auth';
 import { requireAuth, requireRole } from '../auth/middleware';
@@ -18,37 +19,38 @@ import {
 import { createCatalogService } from './service';
 
 /** Public browsing: no sign-in needed. Mounted at /api/v1. */
-export function catalogRouter(deps: { pool: Pool }): Router {
+export function catalogRouter(deps: { pool: Pool; limits?: RouteLimits }): Router {
   const catalog = createCatalogService(deps.pool);
   const router = Router();
+  const browse = (deps.limits ?? NO_LIMITS).browse;
 
-  router.get('/cities', async (_req, res) => {
+  router.get('/cities', browse, async (_req, res) => {
     res.json({ cities: await catalog.listCities() });
   });
 
-  router.get('/cities/:slug/movies', async (req, res) => {
+  router.get('/cities/:slug/movies', browse, async (req, res) => {
     const { slug } = parseParams(slugParam, req);
     const { date } = parseQuery(dateQuery, req);
     res.json({ movies: await catalog.listMoviesInCity(slug, date) });
   });
 
-  router.get('/movies/:id', async (req, res) => {
+  router.get('/movies/:id', browse, async (req, res) => {
     const { id } = parseParams(idParam, req);
     res.json({ movie: await catalog.getMovie(id) });
   });
 
-  router.get('/movies/:id/shows', async (req, res) => {
+  router.get('/movies/:id/shows', browse, async (req, res) => {
     const { id } = parseParams(idParam, req);
     const { city, date } = parseQuery(movieShowsQuery, req);
     res.json({ theatres: await catalog.listShowsForMovie(id, city, date) });
   });
 
-  router.get('/shows/:id', async (req, res) => {
+  router.get('/shows/:id', browse, async (req, res) => {
     const { id } = parseParams(idParam, req);
     res.json({ show: await catalog.getShow(id) });
   });
 
-  router.get('/shows/:id/seats', async (req, res) => {
+  router.get('/shows/:id/seats', browse, async (req, res) => {
     const { id } = parseParams(idParam, req);
     res.json({ seats: await catalog.getSeatMap(id) });
   });

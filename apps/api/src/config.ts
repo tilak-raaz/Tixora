@@ -32,6 +32,11 @@ export const apiEnvSchema = baseEnvSchema
     MAX_SEATS_PER_BOOKING: z.coerce.number().int().min(1).max(20).default(5),
     /** How seats are taken: redis (default), conditional or pessimistic (ADR 0005). */
     HOLD_STRATEGY: z.enum(HOLD_STRATEGIES).default('redis'),
+    /** Per-route rate limits (ADR 0010). Turn off only for local load experiments. */
+    RATE_LIMIT_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
     /** Razorpay test or live keys. Without them the payment endpoints answer 503. */
     ...razorpayEnvShape,
     /** The secret set on the webhook in the Razorpay Dashboard; without it webhooks answer 503. */

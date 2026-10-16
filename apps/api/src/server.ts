@@ -8,6 +8,7 @@ import {
   loadEnvFile,
 } from '@bmt/platform';
 import { createApp } from './app';
+import { DEFAULT_RATE_LIMITS } from './lib/rate-limit';
 import { authConfigFrom, bookingConfigFrom, loadConfig, razorpayConfigFrom } from './config';
 import { createAuth } from './modules/auth/auth';
 import { ENV_FILE } from './paths';
@@ -47,6 +48,7 @@ const app = createApp({
   paymentGateway: razorpay ? createRazorpayGateway(razorpay) : undefined,
   paymentWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
   devPages: config.NODE_ENV === 'development',
+  rateLimits: config.RATE_LIMIT_ENABLED ? { policies: DEFAULT_RATE_LIMITS } : undefined,
 });
 
 const server = app.listen(config.PORT, (err?: Error) => {

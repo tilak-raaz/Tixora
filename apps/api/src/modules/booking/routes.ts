@@ -4,6 +4,7 @@ import type { Logger, Pool, Redis } from '@bmt/platform';
 import { Router } from 'express';
 import { AppError } from '../../lib/errors';
 import { hashRequest, idempotent } from '../../lib/idempotency';
+import { NO_LIMITS, type RouteLimits } from '../../lib/rate-limit';
 import { parseBody, parseParams } from '../../lib/validate';
 import type { Auth } from '../auth/auth';
 import { requireAuth } from '../auth/middleware';
@@ -19,6 +20,7 @@ export function bookingRouter(deps: {
   auth: Auth;
   booking?: BookingConfig;
   holdExpiry?: HoldExpiryScheduler;
+  limits?: RouteLimits;
 }): Router {
   const config = deps.booking ?? DEFAULT_BOOKING_CONFIG;
   const bookings = createBookingService(
@@ -36,7 +38,7 @@ export function bookingRouter(deps: {
    * returns the first response (with Idempotent-Replayed: true) instead of
    * creating a second booking.
    */
-  router.post('/bookings', signedIn, async (req, res) => {
+  router.post('/bookings', signedIn, (deps.limits ?? NO_LIMITS).hold, async (req, res) => {
     const key = req.get('Idempotency-Key')?.trim();
     if (!key || key.length > 255) {
       throw new AppError(
