@@ -18,6 +18,7 @@
     "create-admin": "npm run create-admin -w @bmt/api",
     "seed": "npm run seed -w @bmt/api",
     "bench": "npm run bench -w @bmt/api",
+    "replay-dlq": "npm run replay-dlq -w @bmt/worker --",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -52,6 +52,7 @@ make test        # unit + integration (starts its own containers)
 
 `make help` lists every target. Full setup notes: [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md).
 Paying by hand in Razorpay test mode: [docs/runbooks/payments-local.md](docs/runbooks/payments-local.md).
+When an email or refund is missing: [docs/runbooks/queues.md](docs/runbooks/queues.md).
 
 ## Repository layout
 

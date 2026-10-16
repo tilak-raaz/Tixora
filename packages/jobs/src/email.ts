@@ -104,7 +104,17 @@ export type EmailWorker = Worker<EmailJobData, EmailResult, EmailJobName>;
 
 export function createEmailWorker(
   deps: { redisUrl: string; pool: Pool; mailer: Mailer; logger: Logger },
-  opts: QueueOptions & { concurrency?: number } = {},
+  opts: QueueOptions & {
+    concurrency?: number;
+    /**
+     * How long a job stays locked to a worker without a heartbeat. A worker that
+     * dies mid-job loses the lock after this, and another worker's stalled-job
+     * check puts the job back to waiting. BullMQ's defaults (30 s) are kept in
+     * production; the failure drill shortens them.
+     */
+    lockDuration?: number;
+    stalledInterval?: number;
+  } = {},
 ): EmailWorker {
   const { logger } = deps;
   const worker = new Worker<EmailJobData, EmailResult, EmailJobName>(
@@ -114,8 +124,13 @@ export function createEmailWorker(
       connection: queueConnection(deps.redisUrl, opts),
       prefix: opts.prefix ?? QUEUE_PREFIX,
       concurrency: opts.concurrency ?? 5,
+      ...(opts.lockDuration === undefined ? {} : { lockDuration: opts.lockDuration }),
+      ...(opts.stalledInterval === undefined ? {} : { stalledInterval: opts.stalledInterval }),
     },
   );
+  worker.on('stalled', (jobId) => {
+    logger.warn({ jobId }, 'email job stalled (its worker died); it goes back to waiting');
+  });
   worker.on('failed', (job, err) => {
     const attempts = job?.opts.attempts ?? 1;
     const log = {

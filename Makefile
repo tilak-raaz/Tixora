@@ -1,7 +1,7 @@
 COMPOSE = docker compose -f infra/docker-compose.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench dev-api dev-worker test test-unit test-integration lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker test test-unit test-integration lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -39,6 +39,9 @@ seed: ## Load a demo city, theatres, movies and a week of shows (runs once)
 bench: ## Benchmark the seat-hold strategies; writes docs/benchmarks/ (needs make up)
 	npm run bench
 	npx prettier --write docs/benchmarks
+
+replay-dlq: ## List and replay a queue's failed jobs: make replay-dlq QUEUE=email [DRY=1]
+	npm run replay-dlq -- --queue $(QUEUE) $(if $(DRY),--dry-run,)
 
 dev-api: ## Run the API with reload
 	npm run dev:api
