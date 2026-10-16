@@ -2,6 +2,7 @@ import type { Logger, Pool } from '@bmt/platform';
 import type { PaymentGateway } from '@bmt/payments';
 import { Router, type RequestHandler } from 'express';
 import { AppError } from '../../lib/errors';
+import { NO_LIMITS, type RouteLimits } from '../../lib/rate-limit';
 import { parseBody, parseParams } from '../../lib/validate';
 import type { Auth } from '../auth/auth';
 import { requireAuth } from '../auth/middleware';
@@ -16,6 +17,7 @@ export function paymentRouter(deps: {
   auth: Auth;
   paymentGateway?: PaymentGateway;
   payment?: PaymentConfig;
+  limits?: RouteLimits;
 }): Router {
   const payments = deps.paymentGateway
     ? createPaymentService(deps.pool, deps.paymentGateway, deps.logger, deps.payment)
@@ -30,7 +32,9 @@ export function paymentRouter(deps: {
   };
 
   /** The booking's Razorpay order: 201 when this call created it, 200 when it already existed. */
-  router.post('/bookings/:id/payment-order', signedIn, configured, async (req, res) => {
+  const limited = (deps.limits ?? NO_LIMITS).paymentOrder;
+
+  router.post('/bookings/:id/payment-order', signedIn, limited, configured, async (req, res) => {
     const { id } = parseParams(bookingIdParam, req);
     const { order, created } = await payments!.createOrder(req.auth!.user.id, id);
     res.status(created ? 201 : 200).json({ order });

@@ -4,6 +4,13 @@ import type { Logger, Pool, Redis } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
 import { devRouter } from './dev/routes';
+import {
+  createRateLimiter,
+  NO_LIMITS,
+  routeLimits,
+  type RateLimiter,
+  type RateLimitPolicies,
+} from './lib/rate-limit';
 import { errorHandler } from './middleware/error-handler';
 import { notFoundHandler } from './middleware/not-found';
 import { requestLogger } from './middleware/request-logger';
@@ -33,6 +40,11 @@ export interface AppDeps {
   paymentWebhookSecret?: string;
   /** Serves /dev/checkout. Development only. */
   devPages?: boolean;
+  /**
+   * Rate limits per route class (ADR 0010). Off when absent, as in most tests;
+   * the limiter defaults to one on `redis`.
+   */
+  rateLimits?: { policies: RateLimitPolicies; limiter?: RateLimiter };
 }
 
 /**
@@ -48,12 +60,25 @@ export function createApp(deps: AppDeps): Express {
 
   app.use(requestLogger(deps.logger));
 
+  const limits = deps.rateLimits
+    ? routeLimits(
+        deps.rateLimits.limiter ?? createRateLimiter(deps.redis),
+        deps.rateLimits.policies,
+        deps.logger,
+      )
+    : NO_LIMITS;
+  const routerDeps = { ...deps, limits };
+
+  // Password guessing is limited per IP before Better Auth sees the request.
+  app.post(['/api/auth/sign-in/email', '/api/auth/sign-up/email'], limits.auth);
+
   // Better Auth's endpoints (sign-up, sign-in, sign-out, get-session).
   // Mounted before express.json() because Better Auth reads the raw body itself.
   app.all('/api/auth/*splat', toNodeHandler(deps.auth));
 
   // Razorpay webhooks need the raw body to check its signature, so they also
   // come before express.json().
+  // Never rate limited: Razorpay retries, and every event is deduplicated anyway.
   app.use(razorpayWebhookRouter(deps));
 
   app.use(express.json({ limit: '100kb' }));
@@ -63,9 +88,9 @@ export function createApp(deps: AppDeps): Express {
 
   const v1 = Router();
   v1.use(authRouter(deps));
-  v1.use(catalogRouter(deps));
-  v1.use(bookingRouter(deps));
-  v1.use(paymentRouter(deps));
+  v1.use(catalogRouter(routerDeps));
+  v1.use(bookingRouter(routerDeps));
+  v1.use(paymentRouter(routerDeps));
   v1.use('/admin', adminCatalogRouter(deps));
   app.use('/api/v1', v1);
   if (deps.devPages) app.use(devRouter());

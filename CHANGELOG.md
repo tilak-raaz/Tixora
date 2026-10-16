@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Distributed rate limiting (ADR 0010): each check is one Lua script in Redis using Redis's own clock, so every replica shares one budget per key
+- Token bucket for holds (10/min per user), payment orders (5/min per user) and public browsing (120/min per IP); sliding window log for sign-in and sign-up (5/min per IP, exact)
+- `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` headers; `429 RATE_LIMITED` with `Retry-After`; webhooks are never limited
+- When Redis is down: sign-in and sign-up refuse with 503 (fail closed); every other route stays open
+- Setting `RATE_LIMIT_ENABLED` (default true)
+- Tests: bucket burst, refill and per-subject budgets, 50 simultaneous checks against a capacity of 10, sliding-window edges, both failure modes, and three replicas allowing exactly 10 of 30 holds
+
 ## [0.5.0] - 2026-10-16
 
 M4: async processing.
