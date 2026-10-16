@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
+  createEmailQueue,
   createRefundQueue,
-  createRefundScheduler,
   createRefundWorker,
+  startOutboxRelay,
   startRefundSweeper,
 } from '@bmt/jobs';
 import { createFakeGateway, GatewayError, sendRefund, type FakeGateway } from '@bmt/payments';
@@ -72,9 +73,8 @@ async function latePayment(
   expect(res.status).toBe(200);
   const [refund] = await refundsOf(deps.pool, c.bookingId);
   expect(refund).toMatchObject({ reason: 'HOLD_ENDED' });
-  // With a refund worker running (the end-to-end test) the refund may already
-  // be sent by now; without one it must still be waiting.
-  if (onApp === app) expect(refund!.status).toBe('PENDING');
+  // Nothing sends it until a relay runs, so it must still be waiting.
+  expect(refund!.status).toBe('PENDING');
   return { ...c, refundId: refund!.id, paymentId: paid.id };
 }
 
@@ -190,31 +190,41 @@ describe('refund webhooks', () => {
 });
 
 describe('the refund job and sweeper', () => {
-  it('refunds a late payment end to end: webhook, queue, worker, Razorpay', async () => {
+  it('refunds a late payment end to end: webhook, outbox, relay, queue, worker, Razorpay', async () => {
     const queue = createRefundQueue(inject('redisUrl'), { prefix: `${prefix}-e2e` });
+    const emails = createEmailQueue(inject('redisUrl'), { prefix: `${prefix}-e2e` });
     const worker = createRefundWorker(
       { redisUrl: inject('redisUrl'), pool: deps.pool, gateway, logger },
       { prefix: `${prefix}-e2e` },
     );
-    const withJobs = createApp({
-      ...deps,
-      paymentGateway: gateway,
-      paymentWebhookSecret: WEBHOOK_SECRET,
-      refunds: createRefundScheduler(queue, logger),
-    });
+    const late = await latePayment();
+    // The relay also picks up events other test files left unpublished; their
+    // refunds go to this fake Razorpay too, which is harmless.
+    const relay = startOutboxRelay(
+      { pool: deps.pool, queues: { refunds: queue, email: emails }, logger },
+      { intervalMs: 100 },
+    );
 
     try {
-      const late = await latePayment(withJobs);
       await vi.waitFor(
         async () =>
           expect((await refundsOf(deps.pool, late.bookingId))[0]!.status).toBe('PROCESSED'),
         { timeout: 10_000, interval: 100 },
       );
       expect(await bookingStatus(deps.pool, late.bookingId)).toBe('PENDING_PAYMENT');
+      // The same event also queued the refund email (sent from M4 PR 2).
+      const { rows } = await deps.pool.query<{ id: string }>(
+        "SELECT id FROM outbox WHERE topic = 'refund.recorded' AND aggregate_id = $1",
+        [late.refundId],
+      );
+      expect((await emails.getJob(rows[0]!.id))?.name).toBe('refund-recorded');
     } finally {
+      await relay.stop();
       await worker.close();
-      await queue.obliterate({ force: true });
-      await queue.close();
+      for (const q of [queue, emails]) {
+        await q.obliterate({ force: true });
+        await q.close();
+      }
     }
   });
 
@@ -224,7 +234,7 @@ describe('the refund job and sweeper', () => {
       { redisUrl: inject('redisUrl'), pool: deps.pool, gateway, logger },
       { prefix: `${prefix}-sweep` },
     );
-    const late = await latePayment(); // this app has no refund queue: nothing was queued
+    const late = await latePayment(); // no relay is running: nothing was queued
 
     const sweeper = startRefundSweeper(
       { pool: deps.pool, queue, logger },

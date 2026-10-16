@@ -1,5 +1,4 @@
 import { withTransaction, type Logger, type Pool } from '@bmt/platform';
-import type { RefundScheduler } from '@bmt/jobs';
 import {
   applyCapturedPayment,
   capturedPaymentFrom,
@@ -28,7 +27,6 @@ export function razorpayWebhookRouter(deps: {
   pool: Pool;
   logger: Logger;
   paymentWebhookSecret?: string;
-  refunds?: RefundScheduler;
 }): Router {
   const router = Router();
 
@@ -71,7 +69,8 @@ export function razorpayWebhookRouter(deps: {
         if (rowCount === 0) return 'duplicate_event' as const;
 
         const captured = capturedPaymentFrom(event);
-        if (captured) return applyCapturedPayment(tx, captured);
+        // The request id travels into the outbox event and from there into every job.
+        if (captured) return applyCapturedPayment(tx, captured, { requestId: String(req.id) });
 
         const refund = refundUpdateFrom(event);
         if (refund) {
@@ -84,10 +83,6 @@ export function razorpayWebhookRouter(deps: {
         return 'ignored' as const;
       });
 
-      // Only after the commit: the refund row must exist before its job runs.
-      if (typeof result !== 'string' && result.kind === 'refund') {
-        await deps.refunds?.schedule(result.refundId);
-      }
       log(deps.logger, eventId, String(event.event), result);
       res.json({ received: true });
     },

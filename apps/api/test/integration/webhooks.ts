@@ -36,11 +36,12 @@ export function paymentEvent(
 export function deliver(
   app: Express,
   event: object,
-  opts: { eventId?: string; secret?: string; signature?: string } = {},
+  opts: { eventId?: string; secret?: string; signature?: string; requestId?: string } = {},
 ) {
   const raw = JSON.stringify(event);
-  return request(app)
-    .post('/webhooks/razorpay')
+  const req = request(app).post('/webhooks/razorpay');
+  if (opts.requestId) req.set('X-Request-Id', opts.requestId);
+  return req
     .set('Content-Type', 'application/json')
     .set('X-Razorpay-Event-Id', opts.eventId ?? `evt_${randomUUID()}`)
     .set(

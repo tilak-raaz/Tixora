@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Transactional outbox (ADR 0008): `0007_outbox.sql` adds `outbox` and `processed_messages`; confirming a booking writes `booking.confirmed` and recording a refund writes `refund.recorded`, in the same transaction, with the HTTP request id
+- Outbox relay in the worker: locks unpublished events with `FOR UPDATE SKIP LOCKED`, queues each to its queues under the outbox id as the job id, and marks it published; several relays split the work, and a relay that dies mid-batch causes no duplicate job
+- `email` queue (consumer in the next change); `refund.recorded` feeds both the refund queue and the email queue
+- Worker setting `OUTBOX_RELAY_INTERVAL_MS` (default 500)
+- Tests: rolled-back changes leave no event; two relays at once queue each event exactly once; a relay killed between queuing and committing leaves one job; events survive a Redis outage
+
+### Changed
+
+- Refund jobs are queued by the outbox relay instead of directly by the API and the reconciler; the refund sweeper now only re-queues refunds still `PENDING` after a while
+
 ## [0.4.0] - 2026-10-15
 
 M3: payments.

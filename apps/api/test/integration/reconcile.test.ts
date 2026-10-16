@@ -5,7 +5,7 @@ import {
   type ReconcileOptions,
 } from '@bmt/payments';
 import { createLogger, createPool, type Pool } from '@bmt/platform';
-import { startReconciler, type RefundScheduler } from '@bmt/jobs';
+import { startReconciler } from '@bmt/jobs';
 import {
   afterAll,
   afterEach,
@@ -185,23 +185,37 @@ describe('the reconciler', () => {
     expect(await bookingStatus(deps.pool, b.bookingId)).toBe('CONFIRMED');
   });
 
-  it('queues the refunds it records when running in the worker', async () => {
-    const c = await checkout();
-    await expireHoldNow(deps.pool, c.bookingId);
-    gateway.capture(c.orderId);
-    await age(c.orderId);
-    const scheduled: string[] = [];
-    const refunds: RefundScheduler = { schedule: async (id) => void scheduled.push(id) };
+  it('announces what it applies in the outbox, like the webhook, when running in the worker', async () => {
+    const paid = await checkout();
+    gateway.capture(paid.orderId);
+    await age(paid.orderId);
+    const late = await checkout();
+    await expireHoldNow(deps.pool, late.bookingId);
+    gateway.capture(late.orderId);
+    await age(late.orderId);
 
     const reconciler = startReconciler(
-      { pool: deps.pool, gateway, refunds, logger },
+      { pool: deps.pool, gateway, logger },
       { intervalMs: 60_000, ...OPTIONS },
     );
     try {
-      await vi.waitFor(() => expect(scheduled).toHaveLength(1), { timeout: 5_000, interval: 50 });
-      expect(scheduled[0]).toBe((await refundsOf(deps.pool, c.bookingId))[0]!.id);
+      await vi.waitFor(
+        async () => expect(await bookingStatus(deps.pool, paid.bookingId)).toBe('CONFIRMED'),
+        { timeout: 5_000, interval: 50 },
+      );
     } finally {
       await reconciler.stop();
     }
+
+    const refund = (await refundsOf(deps.pool, late.bookingId))[0]!;
+    const { rows } = await deps.pool.query<{ topic: string; aggregateId: string }>(
+      `SELECT topic, aggregate_id AS "aggregateId" FROM outbox
+       WHERE aggregate_id = ANY($1::uuid[]) ORDER BY topic`,
+      [[paid.bookingId, refund.id]],
+    );
+    expect(rows).toEqual([
+      { topic: 'booking.confirmed', aggregateId: paid.bookingId },
+      { topic: 'refund.recorded', aggregateId: refund.id },
+    ]);
   });
 });

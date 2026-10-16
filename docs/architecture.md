@@ -34,7 +34,7 @@ Razorpay ──webhooks──┘                      ▼
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | `apps/api`          | HTTP layer. Each module in `src/modules/<name>/` has `routes`, `service`, `repo`, `schemas`  |
 | `apps/worker`       | Queue consumers, outbox relay, hold-expiry sweeper, payment reconciler                       |
-| `packages/jobs`     | Queue names, job payloads and their SQL, shared by the API (producer) and worker (consumer)  |
+| `packages/jobs`     | Queues, their consumers, the outbox relay and the periodic sweepers                          |
 | `packages/payments` | Razorpay client over `fetch`, an in-memory fake with the same interface, signature checks    |
 | `packages/platform` | Server-only building blocks: env parsing, logger, Postgres pool, Redis, migrations, shutdown |
 | `packages/shared`   | Types, schemas and constants safe to use in the browser                                      |
@@ -112,15 +112,18 @@ browser: Razorpay Checkout ──▶ success callback ──▶ /payment/verify 
 Razorpay ──▶ POST /webhooks/razorpay ──▶ one transaction:
                store event (dedupe by event id) ─▶ record payment (dedupe by payment id)
                ─▶ lock booking ─▶ hold active and all seats still ours?
-                      yes: seats BOOKED, booking CONFIRMED, payment applied
-                      no:  refund recorded (HOLD_ENDED / DUPLICATE_PAYMENT / AMOUNT_MISMATCH)
+                      yes: seats BOOKED, booking CONFIRMED, payment applied, outbox booking.confirmed
+                      no:  refund recorded (HOLD_ENDED / DUPLICATE_PAYMENT / AMOUNT_MISMATCH),
+                           outbox refund.recorded
+worker: outbox relay (500 ms, SKIP LOCKED) ──▶ booking.confirmed → email queue
+                                               refund.recorded   → refund queue + email queue
 worker: refund job ──▶ Razorpay refund (receipt = refund id) ──▶ PENDING → PROCESSED / FAILED
         refund sweeper (5 min) re-queues refunds still PENDING; refund.* webhooks settle them
 worker: reconciler (2 min) ──▶ unconfirmed orders 1 min to 24 h old, each at most every 10 min
         ──▶ Razorpay: payments of this order ──▶ same confirm-or-refund code as the webhook
 ```
 
-See [ADR 0007](adr/0007-payment-confirmation.md).
+See [ADR 0007](adr/0007-payment-confirmation.md) and [ADR 0008](adr/0008-transactional-outbox.md).
 
 ## Status by milestone
 
