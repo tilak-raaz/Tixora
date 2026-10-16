@@ -1,10 +1,11 @@
-import { formatPaise } from '@bmt/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Container } from '@/components/container';
 import { Perforation } from '@/components/perforation';
+import { SeatPicker } from '@/components/seat-map/seat-picker';
+import { TicketHead } from '@/components/ticket-head';
 import { Tag } from '@/components/ui/tag';
-import { getShow, orNotFound } from '@/lib/catalog';
+import { getSeatMap, getShow, orNotFound } from '@/lib/catalog';
 import { formatDuration, formatShowDate, formatTime } from '@/lib/format';
 
 interface ShowPageProps {
@@ -19,8 +20,9 @@ export async function generateMetadata({ params }: ShowPageProps): Promise<Metad
 
 export default async function ShowPage({ params }: ShowPageProps) {
   const { id } = await params;
-  const show = await orNotFound(getShow(id));
+  const [show, seats] = await Promise.all([orNotFound(getShow(id)), getSeatMap(id)]);
   const cancelled = show.status === 'CANCELLED';
+  const bookable = !cancelled && new Date(show.startsAt).getTime() > Date.now();
 
   return (
     <Container className="flex flex-col gap-6 pt-6 sm:pt-10">
@@ -33,18 +35,13 @@ export default async function ShowPage({ params }: ShowPageProps) {
 
       {/* The show as one ticket: what and where above the tear, when below it. */}
       <section className="overflow-hidden rounded-card bg-card">
-        <div className="flex flex-wrap items-start justify-between gap-3 p-5 sm:p-7">
-          <div>
-            <h1 className="font-display text-4xl leading-[0.92] uppercase sm:text-6xl">
-              {show.movie.title}
-            </h1>
-            <p className="mt-2 text-muted">
-              {show.theatre.name}, {show.screen.name}
-            </p>
-          </div>
-          {cancelled && <Tag tone="primary">Cancelled</Tag>}
-        </div>
-        <Perforation />
+        <TicketHead
+          title={show.movie.title}
+          subtitle={`${show.theatre.name}, ${show.screen.name}`}
+          badge={show.movie.certificate}
+          aside={cancelled ? <Tag>Cancelled</Tag> : undefined}
+        />
+        <Perforation lineClassName="border-transparent" />
         <dl className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4 sm:p-7">
           <Detail label="Date" value={formatShowDate(show.startsAt, show.timezone)} />
           <Detail label="Starts" value={formatTime(show.startsAt, show.timezone)} />
@@ -53,29 +50,16 @@ export default async function ShowPage({ params }: ShowPageProps) {
         </dl>
       </section>
 
-      {show.prices && show.prices.length > 0 && (
-        <section aria-labelledby="prices" className="flex flex-col gap-3">
-          <h2 id="prices" className="font-display text-2xl uppercase">
-            Prices
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {show.prices.map((price) => (
-              <li
-                key={price.categoryId}
-                className="ticket-stub flex min-w-32 flex-col items-center bg-card px-6 py-3"
-              >
-                <span className="text-sm text-muted">{price.category}</span>
-                <span className="font-semibold">{formatPaise(price.pricePaise)}</span>
-              </li>
-            ))}
-          </ul>
+      {bookable ? (
+        <SeatPicker showId={show.id} initialSeats={seats} />
+      ) : (
+        <section className="rounded-card border-2 border-dashed border-line px-6 py-10">
+          <p className="font-display text-2xl uppercase">Booking is closed</p>
+          <p className="mt-1 text-muted">
+            {cancelled ? 'This show was cancelled.' : 'This show has already started.'}
+          </p>
         </section>
       )}
-
-      {/* Replaced by the live seat map in the next PR. */}
-      <section className="rounded-card border-2 border-dashed border-line px-6 py-12 text-center text-muted">
-        Seat selection for this show opens here soon.
-      </section>
     </Container>
   );
 }

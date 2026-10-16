@@ -27,6 +27,19 @@
   --color-warning-soft: #fff1d6;
 
   --radius-card: 0.5rem;
+
+  /* The one animation: a seat someone else just took flashes red once. */
+  --animate-seat-taken: seat-taken 1.2s ease-out forwards;
+  @keyframes seat-taken {
+    0% {
+      background-color: var(--color-primary);
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 60%, transparent);
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: 0 0 0 10px transparent;
+    }
+  }
 }
 
 /* Unavailable seats and sold-out shows: diagonal hatching, so the state does not rely on colour. */

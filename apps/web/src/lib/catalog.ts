@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { isApiError } from './api';
+import type { Seat } from './seat-state';
 import { serverApi } from './server-api';
 
 /** Response shapes of the public catalog endpoints (apps/api/src/modules/catalog). */
@@ -84,6 +85,14 @@ export const getShow = cache(async (id: string) => {
   const { show } = await serverApi<{ show: Show }>(`/shows/${encodeURIComponent(id)}`);
   return show;
 });
+
+/** The seat map, never cached: it changes with every hold. */
+export async function getSeatMap(showId: string): Promise<Seat[]> {
+  const { seats } = await serverApi<{ seats: Seat[] }>(
+    `/shows/${encodeURIComponent(showId)}/seats`,
+  );
+  return seats;
+}
 
 /** Shows the 404 page when the API says the thing does not exist (or the id is malformed). */
 export async function orNotFound<T>(promise: Promise<T>): Promise<T> {

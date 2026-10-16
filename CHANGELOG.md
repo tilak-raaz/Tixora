@@ -16,6 +16,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - Ticket-stub design: movie cards, dates and show times are tickets with a perforated tear line and notched stubs; Anton for headlines and poster titles, Schibsted Grotesk for text; the city picker lives in the header
 - Typographic posters (flat palette colour, frame, rating box, title in poster type) for movies without an image; loading, empty, error and 404 states
 - Server-rendered pages pass the visitor's address to the API in `X-Forwarded-For` (last proxy entry only), so per-IP browse limits stay per visitor
+- Seat map on the show page: screen at the top, a price heading per seat category, aisles as gaps; pick up to 5 seats, hold them, and go to your seats with a 5:00 countdown (red in the last minute) and a way to release them
+- The show page and the checkout open on a ticket in the movie's poster colour, so the look of the poster carries through to the countdown
+- The map stays live: it follows seat events, reloads on reconnect, `resync` or a gap the heartbeat exposes, and a seat someone else takes flashes once; a picked seat taken by someone else is dropped with a message
+- Holding handles every answer: seats just taken (dropped, map reloaded), a hold already open for the show, rate limiting, and signing in first (the picked seats wait in the tab and come back)
 - Live seat updates (ADR 0013): `GET /api/v1/shows/:id/seats/events` streams seat changes as Server-Sent Events (`ready`, `seats`, `heartbeat`, `resync`)
 - Every seat change publishes the seats' state after it commits, on the show's Redis channel: holds, releases, expiry by job, sweeper or a new hold, and payments confirmed by the webhook or the reconciler
 - One Redis subscription per show per replica, dropped when its last viewer leaves; a reconnected subscription tells its viewers to resync
