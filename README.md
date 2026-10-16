@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M4 done (async processing, v0.5.0); M5 next (rate limiting and caching).** Only what is listed under "What works today" is built. Everything
+> **Status: M5 done (rate limiting and caching, v0.6.0); M6 next (Next.js frontend).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
@@ -29,6 +29,12 @@ async processing and distributed rate limiting.
   payment gets a notice with the reason. Every side effect goes through a transactional outbox, so
   it happens if and only if its change committed, and each email is sent once even if a worker
   dies mid-send. Mailpit catches them locally at `localhost:8025`
+- Rate limits shared by every replica (one Lua script per check in Redis): sign-in and sign-up 5
+  per minute per IP, holds 10 per user, payment orders 5 per user, browsing 120 per IP, with
+  `RateLimit-*` headers and `429` + `Retry-After`. Sign-in refuses while Redis is down; everything
+  else stays open
+- Catalog cache in Redis (60 s), cleared on every replica at once by any admin write; the seat map
+  is always live
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, plus integration tests against real Postgres and Redis containers
@@ -107,3 +113,6 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
   no email and sends none twice; two outbox relays running at once queue each event exactly once;
   a relay killed between queuing and committing leaves one job, not two
   ([ADR 0008](docs/adr/0008-transactional-outbox.md), [ADR 0009](docs/adr/0009-email-delivery.md)).
+- **Rate limiting:** three API instances with separate Redis connections let exactly 10 of one
+  user's 30 holds through, not 30; 50 simultaneous checks against a budget of 10 allow exactly 10
+  ([ADR 0010](docs/adr/0010-rate-limiting.md)).
