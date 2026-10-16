@@ -86,3 +86,51 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+
+  stack:
+    name: Full stack (images, nginx, Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Only for Playwright on the runner; the app itself runs from the images built below.
+      - run: npm ci
+
+      - name: Build the images and start the stack
+        run: RATE_LIMIT_ENABLED=false make stack DEMO=1
+
+      - name: Seed
+        run: make stack-seed DEMO=1
+
+      - name: Install Chromium
+        run: npm exec -w @bmt/web -- playwright install --with-deps chromium
+
+      # Healthy is not the same as answering at normal speed right after a build (docs/lessons.md).
+      - name: Wait for the stack to answer normally
+        run: make stack-warm
+
+      - name: Playwright through nginx
+        run: E2E_BASE_URL=http://localhost:8080 npm run e2e
+
+      - name: Container logs
+        if: failure()
+        run: |
+          compose="docker compose -f infra/docker-compose.yml -f infra/docker-compose.demo.yml --profile full"
+          $compose ps -a
+          $compose logs --no-color --tail 200 migrate api worker web nginx
+
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-stack
+          path: apps/web/playwright-report
+          retention-days: 7

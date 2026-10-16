@@ -117,6 +117,18 @@ heartbeat (15 s): show's seat version; browser behind for two heartbeats, or `re
 Events are hints for freshness; the hold transaction still decides
 ([ADR 0013](adr/0013-live-seat-updates.md)).
 
+## Running the stack
+
+```text
+browser ──▶ nginx :8080 ─┬─ /api/*, /webhooks/* ──▶ api ×3, least connections (seat streams count)
+                         └─ everything else ─────▶ web ──▶ nginx :8081 (internal) ──▶ api ×3
+migrate (one-shot) ──▶ exits 0 ──▶ api replicas and workers start
+```
+
+`make stack` runs the app in containers like this, on the same Postgres and Redis as development.
+nginx sets the client address at the edge; server rendering forwards it through the internal port,
+so per-IP limits hold on every path ([ADR 0014](adr/0014-full-stack-behind-nginx.md)).
+
 ## Life of a payment
 
 ```text
@@ -141,14 +153,14 @@ See [ADR 0007](adr/0007-payment-confirmation.md) and [ADR 0008](adr/0008-transac
 
 ## Status by milestone
 
-| Area                          | Milestone | State   |
-| ----------------------------- | --------- | ------- |
-| Foundations                   | M0        | Done    |
-| Accounts and catalog          | M1        | Done    |
-| Seat holds                    | M2        | Done    |
-| Payments                      | M3        | Done    |
-| Outbox and queues             | M4        | Done    |
-| Rate limiting and caching     | M5        | Done    |
-| Frontend                      | M6        | Done    |
-| Replicas, load, failure tests | M7        | Planned |
-| Deployment                    | M8        | Planned |
+| Area                          | Milestone | State       |
+| ----------------------------- | --------- | ----------- |
+| Foundations                   | M0        | Done        |
+| Accounts and catalog          | M1        | Done        |
+| Seat holds                    | M2        | Done        |
+| Payments                      | M3        | Done        |
+| Outbox and queues             | M4        | Done        |
+| Rate limiting and caching     | M5        | Done        |
+| Frontend                      | M6        | Done        |
+| Replicas, load, failure tests | M7        | In progress |
+| Deployment                    | M8        | Planned     |

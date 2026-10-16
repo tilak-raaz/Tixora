@@ -1,7 +1,25 @@
-# Local infrastructure for development.
-# The app itself runs on the host (npm run dev:api / dev:worker) against these containers.
-# The `full` profile (3 API replicas, worker, nginx) is added in M7 for load testing.
+# Local infrastructure.
+# - Default (`make up`): Postgres, Redis and Mailpit; the app runs on the host (make dev-*).
+# - Profile `full` (`make stack`): the app in containers too, production-like, behind nginx at
+#   http://localhost:8080: 3 API replicas, 2 workers, the web server, and migrations run once
+#   before any of them start (ADR 0014). It uses the same Postgres and Redis as `make up`.
 name: bmt
+
+# Settings shared by the API, the worker and the migrate job. The secret has a local-only default;
+# real deployments (M8) pass their own.
+x-server-env: &server-env
+  NODE_ENV: production
+  LOG_LEVEL: info
+  DATABASE_URL: postgres://bmt:bmt@postgres:5432/bmt
+  REDIS_URL: redis://redis:6379
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-stack-only-secret-at-least-32-characters}
+  BETTER_AUTH_URL: http://localhost:8080
+  WEB_ORIGINS: http://localhost:8080
+  # Razorpay test keys from your shell, if exported; without them payments answer 503.
+  # For payments without Razorpay, start the stack with DEMO=1 (docker-compose.demo.yml).
+  RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+  RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+  RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
 
 services:
   postgres:
@@ -39,6 +57,128 @@ services:
     ports:
       - '8025:8025' # web UI
       - '1025:1025' # SMTP
+
+  # --- Profile `full` -------------------------------------------------------------------------
+
+  # Applies pending migrations, then exits. Replicas start only after it succeeds, so no replica
+  # ever runs against an older schema, and two replicas never race to migrate.
+  # The one service that builds the server image; api and worker run the same image. (Compose
+  # refuses to build one tag for three services at once.)
+  migrate:
+    profiles: [full]
+    build:
+      context: ..
+      dockerfile: infra/docker/server.Dockerfile
+    image: bmt-server:local
+    command: ['node', '--import', 'tsx', 'apps/api/src/db/migrate-cli.ts']
+    environment:
+      <<: *server-env
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: [full]
+    image: bmt-server:local
+    # Built by the migrate service above; never pulled from a registry.
+    pull_policy: never
+    command: ['node', '--import', 'tsx', 'apps/api/src/server.ts']
+    init: true
+    environment:
+      <<: *server-env
+      PORT: 4000
+      # Off only for the end-to-end run, which signs up more users a minute than the limit allows.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    # No published ports: the replicas are reached only through nginx, as the service name `api`.
+    deploy:
+      replicas: 3
+    # Longer than SHUTDOWN_TIMEOUT_MS (10 s), so a replica can drain before Docker kills it.
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    profiles: [full]
+    image: bmt-server:local
+    # Built by the migrate service above; never pulled from a registry.
+    pull_policy: never
+    command: ['node', '--import', 'tsx', 'apps/worker/src/main.ts']
+    init: true
+    environment:
+      <<: *server-env
+      MAILER: smtp
+      SMTP_URL: smtp://mailpit:1025
+    # Two workers share the queues; BullMQ hands each job to one of them.
+    deploy:
+      replicas: 2
+    stop_grace_period: 15s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    profiles: [full]
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        API_URL: http://nginx:8081
+    image: bmt-web:local
+    init: true
+    environment:
+      # Server rendering calls the API through nginx's internal port, so it is spread across the
+      # replicas too and the visitor's address survives the extra hop.
+      API_URL: http://nginx:8081
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  nginx:
+    profiles: [full]
+    image: nginx:1.28-alpine
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/nginx/health']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
 
 volumes:
   pg_data:

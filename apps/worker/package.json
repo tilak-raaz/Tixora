@@ -13,6 +13,7 @@
     "@bmt/jobs": "*",
     "@bmt/payments": "*",
     "@bmt/platform": "*",
+    "tsx": "^4.20.0",
     "zod": "^4.1.0"
   }
 }

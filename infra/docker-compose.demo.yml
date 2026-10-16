@@ -1,0 +1,15 @@
+# Layered on the full stack by `make stack DEMO=1` (and `make stack-e2e`): fake payments, so
+# a booking can be paid for without Razorpay. The fake is refused when NODE_ENV=production, so
+# these containers run with NODE_ENV=test; nothing else in the app depends on it.
+services:
+  migrate:
+    environment:
+      NODE_ENV: test
+  api:
+    environment:
+      NODE_ENV: test
+      PAYMENT_GATEWAY: fake
+  worker:
+    environment:
+      NODE_ENV: test
+      PAYMENT_GATEWAY: fake

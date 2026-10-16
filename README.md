@@ -71,11 +71,13 @@ make dev-worker  # hold expiry (second terminal)
 make dev-web     # http://localhost:3000 (third terminal)
 make test        # unit + integration (starts its own containers)
 make e2e         # browser tests (Playwright, fake payments; needs make up migrate seed)
+make stack DEMO=1  # the whole app in containers: nginx, 3 API replicas, 2 workers (http://localhost:8080)
 ```
 
 `make help` lists every target. Full setup notes: [docs/runbooks/local-setup.md](docs/runbooks/local-setup.md).
 Paying by hand in Razorpay test mode: [docs/runbooks/payments-local.md](docs/runbooks/payments-local.md).
 When an email or refund is missing: [docs/runbooks/queues.md](docs/runbooks/queues.md).
+The containerised stack behind nginx: [docs/runbooks/full-stack.md](docs/runbooks/full-stack.md).
 
 ## Repository layout
 
@@ -88,7 +90,7 @@ packages/payments Razorpay client, a fake for tests, signature checks
 packages/platform Server-side building blocks: env, logger, Postgres, Redis, migrations
 packages/shared   Types and constants shared with the frontend
 db/migrations     Forward-only SQL migrations (NNNN_name.sql)
-infra             Docker Compose (nginx and k6 arrive in M7)
+infra             Docker Compose, Dockerfiles, nginx (k6 arrives later in M7)
 docs              Architecture, ADRs, runbooks, benchmarks, lessons
 ```
 
