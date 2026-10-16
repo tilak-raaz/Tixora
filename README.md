@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M3 done (payments, v0.4.0); M4 next (outbox, queues, email tickets).** Only what is listed under "What works today" is built. Everything
+> **Status: M4 done (async processing, v0.5.0); M5 next (rate limiting and caching).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
@@ -25,13 +25,17 @@ async processing and distributed rate limiting.
   wrong-amount payments are refunded automatically, and refunds are retried until Razorpay settles
   them. Pay by hand in test mode at `/dev/checkout`
   ([runbook](docs/runbooks/payments-local.md))
+- Emails and tickets: a confirmed booking gets an email with a PDF ticket (QR code), and a refunded
+  payment gets a notice with the reason. Every side effect goes through a transactional outbox, so
+  it happens if and only if its change committed, and each email is sent once even if a worker
+  dies mid-send. Mailpit catches them locally at `localhost:8025`
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, plus integration tests against real Postgres and Redis containers
 
 ## Stack
 
-TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ · Razorpay ·
+TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ · Razorpay · Resend · PDFKit ·
 Zod · pino · Vitest + Testcontainers · Docker Compose · GitHub Actions
 
 ## Quickstart
@@ -99,3 +103,7 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
   never-delivered webhooks are all tested, and six money-and-seat invariants are checked after
   every one: no booking is confirmed without exactly one applied payment, and every other captured
   payment is refunded exactly once ([ADR 0007](docs/adr/0007-payment-confirmation.md)).
+- **Async processing:** an email worker killed with `SIGKILL` in the middle of a batch of 20 loses
+  no email and sends none twice; two outbox relays running at once queue each event exactly once;
+  a relay killed between queuing and committing leaves one job, not two
+  ([ADR 0008](docs/adr/0008-transactional-outbox.md), [ADR 0009](docs/adr/0009-email-delivery.md)).

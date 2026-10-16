@@ -5,22 +5,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-16
+
+M4: async processing.
+
 ### Added
 
 - Transactional outbox (ADR 0008): `0007_outbox.sql` adds `outbox` and `processed_messages`; confirming a booking writes `booking.confirmed` and recording a refund writes `refund.recorded`, in the same transaction, with the HTTP request id
 - Outbox relay in the worker: locks unpublished events with `FOR UPDATE SKIP LOCKED`, queues each to its queues under the outbox id as the job id, and marks it published; several relays split the work, and a relay that dies mid-batch causes no duplicate job
+- Worker setting `OUTBOX_RELAY_INTERVAL_MS` (default 500)
 - `email` queue; `refund.recorded` feeds both the refund queue and the email queue
 - Emails (ADR 0009): "Booking confirmed" (show, seats, total, reference) and "Refund on its way" (amount and the reason in plain words), read from Postgres when sent, with names escaped in HTML
-- PDF ticket (A6, QR code with the booking id, show, seats, amount, reference), rendered from the booking with PDFKit and attached to the confirmation email; never stored, so it always matches the booking
-- `GET /api/v1/bookings/:id/ticket`: the ticket for the owner of a confirmed booking (409 `BOOKING_NOT_CONFIRMED` otherwise, 404 for anyone else's)
 - `Mailer` with three implementations: SMTP via Nodemailer to Mailpit in development, Resend's HTTP API in production, and a fake for tests
 - Each email is sent once per event: `processed_messages` skips finished messages, and the outbox id is the provider's idempotency key, so a send repeated after a crash is dropped
 - Worker settings `MAILER`, `SMTP_URL`, `RESEND_API_KEY`, `EMAIL_FROM`
+- PDF ticket (A6, QR code with the booking id, show, seats, amount, reference), rendered from the booking with PDFKit and attached to the confirmation email; never stored, so it always matches the booking
+- `GET /api/v1/bookings/:id/ticket`: the ticket for the owner of a confirmed booking (409 `BOOKING_NOT_CONFIRMED` otherwise, 404 for anyone else's)
 - Dead letter queue: failed jobs stay in each queue's failed set; `make replay-dlq QUEUE=email [DRY=1]` lists them with the reason and request id, and moves them back to waiting once the cause is fixed
 - Failure drill: an email worker in its own process is killed with `SIGKILL` mid-batch; the worker that takes over (after the stalled-job check) delivers every email, and none twice
-- [docs/runbooks/queues.md](docs/runbooks/queues.md): following a missing email or refund from the outbox to the queue, reading queue state, replaying failed jobs
-- Worker setting `OUTBOX_RELAY_INTERVAL_MS` (default 500)
 - Tests: rolled-back changes leave no event; two relays at once queue each event exactly once; a relay killed between queuing and committing leaves one job; events survive a Redis outage
+- [docs/runbooks/queues.md](docs/runbooks/queues.md): following a missing email or refund from the outbox to the queue, reading queue state, replaying failed jobs
 
 ### Changed
 
@@ -112,7 +116,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/tilak-raaz/Tixora/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/tilak-raaz/Tixora/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tilak-raaz/Tixora/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tilak-raaz/Tixora/compare/v0.1.0...v0.2.0

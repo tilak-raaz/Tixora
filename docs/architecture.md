@@ -134,7 +134,7 @@ See [ADR 0007](adr/0007-payment-confirmation.md) and [ADR 0008](adr/0008-transac
 | Accounts and catalog          | M1        | Done    |
 | Seat holds                    | M2        | Done    |
 | Payments                      | M3        | Done    |
-| Outbox and queues             | M4        | Planned |
+| Outbox and queues             | M4        | Done    |
 | Rate limiting and caching     | M5        | Planned |
 | Frontend                      | M6        | Planned |
 | Replicas, load, failure tests | M7        | Planned |
