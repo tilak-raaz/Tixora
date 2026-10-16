@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "replay-dlq": "tsx src/scripts/replay-dlq.ts"
   },
   "dependencies": {
     "@bmt/jobs": "*",

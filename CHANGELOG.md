@@ -16,6 +16,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `Mailer` with three implementations: SMTP via Nodemailer to Mailpit in development, Resend's HTTP API in production, and a fake for tests
 - Each email is sent once per event: `processed_messages` skips finished messages, and the outbox id is the provider's idempotency key, so a send repeated after a crash is dropped
 - Worker settings `MAILER`, `SMTP_URL`, `RESEND_API_KEY`, `EMAIL_FROM`
+- Dead letter queue: failed jobs stay in each queue's failed set; `make replay-dlq QUEUE=email [DRY=1]` lists them with the reason and request id, and moves them back to waiting once the cause is fixed
+- Failure drill: an email worker in its own process is killed with `SIGKILL` mid-batch; the worker that takes over (after the stalled-job check) delivers every email, and none twice
+- [docs/runbooks/queues.md](docs/runbooks/queues.md): following a missing email or refund from the outbox to the queue, reading queue state, replaying failed jobs
 - Worker setting `OUTBOX_RELAY_INTERVAL_MS` (default 500)
 - Tests: rolled-back changes leave no event; two relays at once queue each event exactly once; a relay killed between queuing and committing leaves one job; events survive a Redis outage
 
