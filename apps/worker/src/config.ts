@@ -44,6 +44,8 @@ const workerEnvSchema = baseEnvSchema
       .int()
       .min(1_000)
       .default(2 * 60_000),
+    /** The API's PAYMENT_GATEWAY: with `fake`, payments never reached Razorpay, so neither do refunds. */
+    PAYMENT_GATEWAY: optionalEnv(z.enum(['razorpay', 'fake'])),
   })
   .refine(razorpayKeysPaired, RAZORPAY_PAIR_ISSUE)
   .refine((c) => c.MAILER !== 'resend' || Boolean(c.RESEND_API_KEY), {
@@ -54,6 +56,7 @@ const workerEnvSchema = baseEnvSchema
 export type WorkerConfig = z.output<typeof workerEnvSchema>;
 
 export function razorpayConfigFrom(config: WorkerConfig): RazorpayConfig | undefined {
+  if (config.PAYMENT_GATEWAY === 'fake') return undefined;
   if (!config.RAZORPAY_KEY_ID || !config.RAZORPAY_KEY_SECRET) return undefined;
   return { keyId: config.RAZORPAY_KEY_ID, keySecret: config.RAZORPAY_KEY_SECRET };
 }

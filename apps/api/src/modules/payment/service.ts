@@ -8,9 +8,11 @@ import type { VerifyCheckoutInput } from './schemas';
 export interface PaymentConfig {
   /** No new order for a hold with less time left than this; the buyer picks seats again. */
   minSecondsLeft: number;
+  /** Which checkout the browser opens: Razorpay's, or the fake one (PAYMENT_GATEWAY=fake). */
+  checkout: 'razorpay' | 'fake';
 }
 
-export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = { minSecondsLeft: 60 };
+export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = { minSecondsLeft: 60, checkout: 'razorpay' };
 
 /** Everything the browser needs to open Razorpay Checkout. */
 export interface PaymentOrderView {
@@ -20,6 +22,7 @@ export interface PaymentOrderView {
   currency: string;
   keyId: string;
   expiresAt: Date;
+  checkout: PaymentConfig['checkout'];
 }
 
 export type PaymentService = ReturnType<typeof createPaymentService>;
@@ -28,8 +31,9 @@ export function createPaymentService(
   pool: Pool,
   gateway: PaymentGateway,
   logger: Logger,
-  config: PaymentConfig = DEFAULT_PAYMENT_CONFIG,
+  partialConfig: Partial<PaymentConfig> = {},
 ) {
+  const config: PaymentConfig = { ...DEFAULT_PAYMENT_CONFIG, ...partialConfig };
   async function activeHold(userId: string, bookingId: string): Promise<repo.PayableBooking> {
     const booking = await repo.findBookingForPayment(pool, bookingId, userId);
     // Someone else's booking is "not found", as everywhere else.
@@ -48,6 +52,7 @@ export function createPaymentService(
       currency: order.currency,
       keyId: gateway.keyId,
       expiresAt: booking.expiresAt,
+      checkout: config.checkout,
     };
   }
 

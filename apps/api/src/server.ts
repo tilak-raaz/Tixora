@@ -1,5 +1,6 @@
 import { createHoldExpiryQueue, createHoldExpiryScheduler } from '@bmt/jobs';
-import { createRazorpayGateway } from '@bmt/payments';
+import { randomBytes } from 'node:crypto';
+import { createFakeGateway, createRazorpayGateway } from '@bmt/payments';
 import {
   createLogger,
   createPool,
@@ -34,8 +35,15 @@ const pool = createPool({
 const redis = createRedis(config.REDIS_URL, logger);
 const auth = createAuth({ pool, redis, logger, config: authConfigFrom(config) });
 
-const razorpay = razorpayConfigFrom(config);
-if (!razorpay)
+// Payments: Razorpay, or the fake for development (PAYMENT_GATEWAY=fake), or none (503).
+const fakeGateway = config.PAYMENT_GATEWAY === 'fake' ? createFakeGateway() : undefined;
+const razorpay = fakeGateway ? undefined : razorpayConfigFrom(config);
+const paymentGateway = fakeGateway ?? (razorpay ? createRazorpayGateway(razorpay) : undefined);
+// The fake signs its own webhooks; any secret works as long as it is the same one.
+const paymentWebhookSecret =
+  config.RAZORPAY_WEBHOOK_SECRET ?? (fakeGateway ? randomBytes(32).toString('hex') : undefined);
+if (fakeGateway) logger.warn('PAYMENT_GATEWAY=fake: payments are simulated, nothing is charged');
+else if (!razorpay)
   logger.warn('RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not set: payment endpoints answer 503');
 
 // Live seat maps (ADR 0013): announce this replica's seat changes, forward everyone's.
@@ -52,9 +60,10 @@ const app = createApp({
   auth,
   booking: bookingConfigFrom(config),
   holdExpiry: createHoldExpiryScheduler(holdExpiryQueue, logger),
-  paymentGateway: razorpay ? createRazorpayGateway(razorpay) : undefined,
-  paymentWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
-  devPages: config.NODE_ENV === 'development',
+  paymentGateway,
+  paymentWebhookSecret,
+  payment: { checkout: fakeGateway ? 'fake' : 'razorpay' },
+  fakePayments: fakeGateway ? { gateway: fakeGateway } : undefined,
   rateLimits: config.RATE_LIMIT_ENABLED ? { policies: DEFAULT_RATE_LIMITS } : undefined,
   cache:
     config.CATALOG_CACHE_TTL_SECONDS > 0

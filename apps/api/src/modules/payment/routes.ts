@@ -16,7 +16,7 @@ export function paymentRouter(deps: {
   logger: Logger;
   auth: Auth;
   paymentGateway?: PaymentGateway;
-  payment?: PaymentConfig;
+  payment?: Partial<PaymentConfig>;
   limits?: RouteLimits;
 }): Router {
   const payments = deps.paymentGateway

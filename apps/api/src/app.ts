@@ -1,9 +1,8 @@
 import type { HoldExpiryScheduler } from '@bmt/jobs';
-import type { PaymentGateway } from '@bmt/payments';
+import type { FakeGateway, PaymentGateway } from '@bmt/payments';
 import type { Logger, Pool, Redis, SeatEventPublisher } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
-import { devRouter } from './dev/routes';
 import type { Cache } from './lib/cache';
 import {
   createRateLimiter,
@@ -22,6 +21,7 @@ import type { BookingConfig } from './modules/booking/service';
 import { adminCatalogRouter, catalogRouter } from './modules/catalog/routes';
 import type { SeatEventHub } from './modules/live/hub';
 import { liveRouter } from './modules/live/routes';
+import { fakeCheckoutRouter } from './modules/payment/fake-checkout';
 import { paymentRouter } from './modules/payment/routes';
 import type { PaymentConfig } from './modules/payment/service';
 import { razorpayWebhookRouter } from './modules/payment/webhook';
@@ -38,11 +38,14 @@ export interface AppDeps {
   holdExpiry?: HoldExpiryScheduler;
   /** Razorpay (or the fake in tests); without it the payment endpoints answer 503. */
   paymentGateway?: PaymentGateway;
-  payment?: PaymentConfig;
+  payment?: Partial<PaymentConfig>;
   /** Verifies Razorpay webhooks; without it /webhooks/razorpay answers 503. */
   paymentWebhookSecret?: string;
-  /** Serves /dev/checkout. Development only. */
-  devPages?: boolean;
+  /**
+   * PAYMENT_GATEWAY=fake: payments without Razorpay, for development and the end-to-end tests.
+   * Also pass it as paymentGateway; it mounts POST /api/v1/dev/fake-payments/:id.
+   */
+  fakePayments?: { gateway: FakeGateway; webhookDelayMs?: number };
   /**
    * Rate limits per route class (ADR 0010). Off when absent, as in most tests;
    * the limiter defaults to one on `redis`.
@@ -104,8 +107,18 @@ export function createApp(deps: AppDeps): Express {
   v1.use(bookingRouter(routerDeps));
   v1.use(paymentRouter(routerDeps));
   v1.use('/admin', adminCatalogRouter(routerDeps));
+  if (deps.fakePayments && deps.paymentWebhookSecret) {
+    v1.use(
+      '/dev',
+      fakeCheckoutRouter({
+        ...deps,
+        fakeGateway: deps.fakePayments.gateway,
+        paymentWebhookSecret: deps.paymentWebhookSecret,
+        webhookDelayMs: deps.fakePayments.webhookDelayMs,
+      }),
+    );
+  }
   app.use('/api/v1', v1);
-  if (deps.devPages) app.use(devRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

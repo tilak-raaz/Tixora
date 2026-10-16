@@ -28,6 +28,62 @@ export async function holdSeats(
   return booking;
 }
 
+/** A booking in My bookings (GET /bookings), with what the list shows of its show. */
+export interface BookingSummary {
+  id: string;
+  showId: string;
+  status: Booking['status'];
+  totalPaise: number;
+  expiresAt: string;
+  createdAt: string;
+  show: {
+    startsAt: string;
+    timezone: string;
+    movieTitle: string;
+    certificate: string;
+    theatre: string;
+    screen: string;
+  };
+  seats: string[];
+}
+
+export async function listBookings(): Promise<BookingSummary[]> {
+  const { bookings } = await api<{ bookings: BookingSummary[] }>('/bookings');
+  return bookings;
+}
+
+export interface BookingGroups {
+  upcoming: BookingSummary[];
+  awaitingPayment: BookingSummary[];
+  past: BookingSummary[];
+  ended: BookingSummary[];
+}
+
+/** Splits My bookings into what is coming up, what still needs paying, what has been, and the rest. */
+export function groupBookings(bookings: BookingSummary[], now = Date.now()): BookingGroups {
+  const groups: BookingGroups = { upcoming: [], awaitingPayment: [], past: [], ended: [] };
+  for (const booking of bookings) {
+    if (booking.status === 'CONFIRMED') {
+      const startsAt = new Date(booking.show.startsAt).getTime();
+      (startsAt > now ? groups.upcoming : groups.past).push(booking);
+    } else if (booking.status === 'PENDING_PAYMENT') {
+      groups.awaitingPayment.push(booking);
+    } else {
+      groups.ended.push(booking);
+    }
+  }
+  // Soonest show first for what is coming up.
+  groups.upcoming.sort(
+    (a, b) => new Date(a.show.startsAt).getTime() - new Date(b.show.startsAt).getTime(),
+  );
+  return groups;
+}
+
+/** The short reference printed on the ticket (same as the PDF): the booking id's first 8 characters. */
+export function ticketReference(bookingId: string): string {
+  return bookingId.slice(0, 8).toUpperCase();
+}
+
 export async function getBooking(id: string): Promise<Booking> {
   const { booking } = await api<{ booking: Booking }>(`/bookings/${encodeURIComponent(id)}`);
   return booking;

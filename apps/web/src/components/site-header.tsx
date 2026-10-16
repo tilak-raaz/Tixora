@@ -23,7 +23,7 @@ export function SiteHeader({ cities, rememberedCity }: SiteHeaderProps) {
       <Container className="flex h-16 items-center justify-between gap-3">
         <Link href="/" className="flex items-center gap-2.5" aria-label={`${SITE_NAME} home`}>
           <LogoMark />
-          <span className="hidden font-display text-[1.6rem] leading-none tracking-wide uppercase min-[380px]:block">
+          <span className="hidden font-display text-[1.6rem] leading-none tracking-wide uppercase sm:block">
             {SITE_NAME}
           </span>
         </Link>
@@ -73,12 +73,19 @@ function Account() {
   const name = session.user.name || session.user.email;
   return (
     <div className="flex items-center gap-2">
-      <span
-        aria-hidden
+      {/* A wrapper, because the link's own inline-flex would override `hidden`. */}
+      <span className="hidden lg:block">
+        <ButtonLink href="/bookings" variant="ghost" size="sm">
+          My bookings
+        </ButtonLink>
+      </span>
+      <Link
+        href="/bookings"
+        aria-label="My bookings"
         className="flex size-9 items-center justify-center rounded-md bg-ink font-display text-lg text-white"
       >
         {name.charAt(0).toUpperCase()}
-      </span>
+      </Link>
       <span className="hidden max-w-36 truncate text-sm font-semibold md:block">{name}</span>
       <Button variant="ghost" size="sm" onClick={signOut} loading={signingOut}>
         Sign out
