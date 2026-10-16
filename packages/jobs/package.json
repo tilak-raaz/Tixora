@@ -16,6 +16,11 @@
   "dependencies": {
     "@bmt/payments": "*",
     "@bmt/platform": "*",
-    "bullmq": "^6.3.15"
+    "@bmt/shared": "*",
+    "bullmq": "^6.3.15",
+    "nodemailer": "^10.1.1"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.2"
   }
 }

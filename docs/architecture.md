@@ -115,8 +115,9 @@ Razorpay ──▶ POST /webhooks/razorpay ──▶ one transaction:
                       yes: seats BOOKED, booking CONFIRMED, payment applied, outbox booking.confirmed
                       no:  refund recorded (HOLD_ENDED / DUPLICATE_PAYMENT / AMOUNT_MISMATCH),
                            outbox refund.recorded
-worker: outbox relay (500 ms, SKIP LOCKED) ──▶ booking.confirmed → email queue
-                                               refund.recorded   → refund queue + email queue
+worker: outbox relay (500 ms, SKIP LOCKED) ──▶ booking.confirmed → email queue (confirmation)
+                                               refund.recorded   → refund queue + email queue (refund notice)
+worker: email job ──▶ skip if in processed_messages ──▶ send (idempotency key = outbox id) ──▶ record
 worker: refund job ──▶ Razorpay refund (receipt = refund id) ──▶ PENDING → PROCESSED / FAILED
         refund sweeper (5 min) re-queues refunds still PENDING; refund.* webhooks settle them
 worker: reconciler (2 min) ──▶ unconfirmed orders 1 min to 24 h old, each at most every 10 min

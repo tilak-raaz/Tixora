@@ -1,5 +1,6 @@
 import {
   createEmailQueue,
+  createEmailWorker,
   createHoldExpiryWorker,
   createRefundQueue,
   createRefundWorker,
@@ -17,13 +18,13 @@ import {
   installProcessHandlers,
   loadEnvFile,
 } from '@bmt/platform';
-import { ENV_FILE, loadConfig, razorpayConfigFrom } from './config';
+import { ENV_FILE, loadConfig, mailerFrom, razorpayConfigFrom } from './config';
 
 /**
  * Worker process: runs everything slow or retryable, separately from the API.
  * Today: the outbox relay (ADR 0008), hold expiry (a delayed job per hold, plus
  * a sweeper as the safety net), refunds (a job per refund, plus a sweeper) and
- * the payment reconciler. M4 PR 2 adds the email consumer.
+ * the payment reconciler, and emails (confirmations and refund notices).
  */
 loadEnvFile(ENV_FILE);
 const config = loadConfig();
@@ -87,6 +88,14 @@ periodic.push(
   ),
 );
 
+const mailer = mailerFrom(config);
+const emailWorker = createEmailWorker({ redisUrl: config.REDIS_URL, pool, mailer, logger });
+closers.push(
+  () => emailWorker.close(),
+  async () => mailer.close?.(),
+);
+queues.push('email');
+
 const razorpay = razorpayConfigFrom(config);
 if (razorpay) {
   const gateway = createRazorpayGateway(razorpay);
@@ -114,4 +123,4 @@ stopConsumers = async () => {
   for (const close of closers) await close();
 };
 
-logger.info({ queues, relay: true }, 'worker ready');
+logger.info({ queues, relay: true, mailer: mailer.kind }, 'worker ready');

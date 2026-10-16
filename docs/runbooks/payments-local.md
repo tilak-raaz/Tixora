@@ -74,6 +74,11 @@ for the 5 minutes to pass with Checkout open, then pay: the booking stays `EXPIR
 seconds (`make psql`, then `SELECT reason, status, razorpay_refund_id FROM refunds;`). It shows
 up under **Transactions → Refunds** in the Dashboard.
 
+## Emails
+
+With `make dev-worker` running, every confirmation and refund notice lands in Mailpit at
+<http://localhost:8025> (started by `make up`). Nothing is sent to a real address in development.
+
 ## Webhooks that never arrive
 
 Stop `cloudflared` (or delete the webhook), pay on `/dev/checkout`, and watch the booking stay
