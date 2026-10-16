@@ -15,6 +15,7 @@ import {
   createLogger,
   createPool,
   createRedis,
+  createSeatEventPublisher,
   installProcessHandlers,
   loadEnvFile,
 } from '@bmt/platform';
@@ -62,12 +63,15 @@ try {
   process.exit(1);
 }
 
+// Seats this worker frees or confirms are announced to browsers watching the show (ADR 0013).
+const seatEvents = createSeatEventPublisher({ pool, redis, logger });
+
 const holdExpiry = createHoldExpiryWorker(
-  { redisUrl: config.REDIS_URL, pool, logger },
+  { redisUrl: config.REDIS_URL, pool, logger, seatEvents },
   { concurrency: config.HOLD_EXPIRY_CONCURRENCY },
 );
 const sweeper = startHoldSweeper(
-  { pool, logger },
+  { pool, logger, seatEvents },
   { intervalMs: config.HOLD_SWEEP_INTERVAL_MS, batchSize: config.HOLD_SWEEP_BATCH_SIZE },
 );
 const queues = ['hold-expiry'];
@@ -105,7 +109,10 @@ if (razorpay) {
       { pool, queue: refundQueue, logger },
       { intervalMs: config.REFUND_SWEEP_INTERVAL_MS },
     ),
-    startReconciler({ pool, gateway, logger }, { intervalMs: config.RECONCILE_INTERVAL_MS }),
+    startReconciler(
+      { pool, gateway, logger, seatEvents },
+      { intervalMs: config.RECONCILE_INTERVAL_MS },
+    ),
   );
   closers.push(() => refundWorker.close());
   queues.push('refunds');

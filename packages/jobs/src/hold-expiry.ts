@@ -1,4 +1,4 @@
-import type { Logger, Pool, PoolClient } from '@bmt/platform';
+import type { Logger, Pool, PoolClient, SeatEventPublisher } from '@bmt/platform';
 import { Queue, Worker } from 'bullmq';
 import { QUEUE_PREFIX, queueConnection, type QueueOptions } from './connection';
 import { startPeriodic, withTimeout, type Periodic } from './periodic';
@@ -157,13 +157,23 @@ export function createHoldExpiryScheduler(
 export type HoldExpiryWorker = Worker<HoldExpiryData, HoldExpiryResult, typeof JOB_NAME>;
 
 export function createHoldExpiryWorker(
-  deps: { redisUrl: string; pool: Pool; logger: Logger },
+  deps: {
+    redisUrl: string;
+    pool: Pool;
+    logger: Logger;
+    /** Tells browsers watching the show that the seats are free again (ADR 0013). */
+    seatEvents?: SeatEventPublisher;
+  },
   opts: QueueOptions & { concurrency?: number } = {},
 ): HoldExpiryWorker {
   const { logger } = deps;
   const worker = new Worker<HoldExpiryData, HoldExpiryResult, typeof JOB_NAME>(
     HOLD_EXPIRY_QUEUE,
-    async (job) => expireHold(deps.pool, job.data.bookingId),
+    async (job) => {
+      const result = await expireHold(deps.pool, job.data.bookingId);
+      if (result === 'expired') await deps.seatEvents?.publishBookings([job.data.bookingId]);
+      return result;
+    },
     {
       connection: queueConnection(deps.redisUrl, opts),
       prefix: opts.prefix ?? QUEUE_PREFIX,
@@ -192,13 +202,14 @@ export type HoldSweeper = Periodic;
  * the Redis queue, does not.
  */
 export function startHoldSweeper(
-  deps: { pool: Pool; logger: Logger },
+  deps: { pool: Pool; logger: Logger; seatEvents?: SeatEventPublisher },
   opts: { intervalMs: number; batchSize: number },
 ): HoldSweeper {
   return startPeriodic(
     'hold sweep',
     async () => {
       const released = await drainExpiredHolds(deps.pool, opts.batchSize);
+      await deps.seatEvents?.publishBookings(released);
       if (released.length > 0) {
         deps.logger.info({ released: released.length }, 'sweeper released expired holds');
       }

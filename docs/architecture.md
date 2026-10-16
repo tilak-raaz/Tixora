@@ -105,6 +105,18 @@ A seat whose hold has run out is free to the next buyer straight away; the job a
 only make the stored state catch up ([ADR 0005](adr/0005-seat-hold-strategy.md),
 [ADR 0006](adr/0006-hold-expiry.md)).
 
+## Live seat maps
+
+```text
+hold / release / expiry / confirm commits ──▶ read the seats back ──▶ PUBLISH bmt:seats:<show>
+every API replica: one SUBSCRIBE per show it has viewers for ──▶ SSE `seats` event to each viewer
+browser: open stream ──▶ `ready` ──▶ GET /shows/:id/seats ──▶ merge events by seat version
+heartbeat (15 s): show's seat version; browser behind for two heartbeats, or `resync` ──▶ reload map
+```
+
+Events are hints for freshness; the hold transaction still decides
+([ADR 0013](adr/0013-live-seat-updates.md)).
+
 ## Life of a payment
 
 ```text
@@ -137,6 +149,6 @@ See [ADR 0007](adr/0007-payment-confirmation.md) and [ADR 0008](adr/0008-transac
 | Payments                      | M3        | Done    |
 | Outbox and queues             | M4        | Done    |
 | Rate limiting and caching     | M5        | Done    |
-| Frontend                      | M6        | Planned |
+| Frontend                      | M6        | Started |
 | Replicas, load, failure tests | M7        | Planned |
 | Deployment                    | M8        | Planned |

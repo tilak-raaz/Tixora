@@ -1,5 +1,5 @@
 import type { HoldExpiryScheduler } from '@bmt/jobs';
-import { withTransaction, type Pool } from '@bmt/platform';
+import { NO_SEAT_EVENTS, withTransaction, type Pool, type SeatEventPublisher } from '@bmt/platform';
 import { AppError, NotFoundError } from '../../lib/errors';
 import { isPgError, PG_UNIQUE_VIOLATION } from '../../lib/pg-errors';
 import * as repo from './repo';
@@ -28,18 +28,20 @@ export type BookingService = ReturnType<typeof createBookingService>;
  * (handy in tests); the app passes the configured one (`redis` by default).
  * `expiry` queues the job that releases a hold when it runs out; without it
  * (tests, the benchmark) the worker's sweeper still releases it.
+ * `seatEvents` tells everyone watching the show which seats changed (ADR 0013).
  */
 export function createBookingService(
   pool: Pool,
   config: BookingConfig = DEFAULT_BOOKING_CONFIG,
   strategy: SeatHoldStrategy = conditionalStrategy,
   expiry?: HoldExpiryScheduler,
+  seatEvents: SeatEventPublisher = NO_SEAT_EVENTS,
 ) {
   /** The hold transaction: everything except the optional pre-lock. */
   async function holdInDatabase(
     userId: string,
     input: HoldInput,
-  ): Promise<{ id: string; expiresAt: Date }> {
+  ): Promise<{ id: string; expiresAt: Date; expiredIds: string[] }> {
     return withTransaction(pool, async (tx) => {
       const show = await repo.findShowForHold(tx, input.showId);
       if (!show) throw new NotFoundError('Show not found');
@@ -47,7 +49,7 @@ export function createBookingService(
         throw new AppError(400, 'VALIDATION_FAILED', 'This show is no longer open for booking');
       }
 
-      await repo.expireStaleHold(tx, userId, input.showId);
+      const expiredIds = await repo.expireStaleHold(tx, userId, input.showId);
 
       const seats = await repo.findSeatPrices(tx, input.showId, input.seatIds);
       if (seats.length !== input.seatIds.length) {
@@ -88,7 +90,7 @@ export function createBookingService(
       }
 
       await repo.insertBookingSeats(tx, booking.id, seats);
-      return booking;
+      return { ...booking, expiredIds };
     });
   }
 
@@ -101,7 +103,7 @@ export function createBookingService(
      * (seat taken, second pending booking) leaves no trace.
      */
     async hold(userId: string, input: HoldInput): Promise<repo.BookingView> {
-      let booking: { id: string; expiresAt: Date };
+      let booking: { id: string; expiresAt: Date; expiredIds: string[] };
       if (strategy.preLock) {
         const lock = await strategy.preLock({ showId: input.showId, showSeatIds: input.seatIds });
         if (!lock.ok) {
@@ -118,8 +120,11 @@ export function createBookingService(
       } else {
         booking = await holdInDatabase(userId, input);
       }
-      // Only after the commit: a job for a hold that rolled back would be noise.
-      await expiry?.schedule(booking.id, booking.expiresAt);
+      // Only after the commit: a job or an event for a hold that rolled back would be noise.
+      await Promise.all([
+        expiry?.schedule(booking.id, booking.expiresAt),
+        seatEvents.publishBookings([booking.id, ...booking.expiredIds]),
+      ]);
       return (await repo.findBookingView(pool, booking.id, userId))!;
     },
 
@@ -142,6 +147,7 @@ export function createBookingService(
         }
         throw new AppError(409, 'HOLD_NOT_ACTIVE', 'Only an active hold can be released');
       });
+      await seatEvents.publishBookings([bookingId]);
       return (await repo.findBookingView(pool, bookingId, userId))!;
     },
   };

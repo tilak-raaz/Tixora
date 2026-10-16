@@ -5,3 +5,4 @@ export * from './redis';
 export * from './migrate';
 export * from './process';
 export * from './outbox';
+export * from './seat-events';
