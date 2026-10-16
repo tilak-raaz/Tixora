@@ -17,6 +17,71 @@ import {
 import express, { Router } from 'express';
 import { AppError } from '../../lib/errors';
 
+export interface WebhookDeps {
+  pool: Pool;
+  logger: Logger;
+  paymentWebhookSecret?: string;
+  seatEvents?: SeatEventPublisher;
+}
+
+export type WebhookResult = CaptureOutcome | 'duplicate_event' | 'ignored' | 'refund_updated';
+
+/**
+ * Checks and applies one Razorpay webhook delivery. The route below calls it for real deliveries;
+ * the fake payment mode calls it with events it signs itself, so a fake payment goes through
+ * exactly the same checks and the same confirm-or-refund code as a real one.
+ */
+export async function handleRazorpayWebhook(
+  deps: WebhookDeps,
+  delivery: { raw: Buffer; signature: string; eventId: string | undefined; requestId: string },
+): Promise<WebhookResult> {
+  const secret = deps.paymentWebhookSecret;
+  if (!secret) {
+    throw new AppError(503, 'SERVICE_UNAVAILABLE', 'Webhooks are not configured on this server');
+  }
+  const { raw, signature, eventId } = delivery;
+  if (!verifyWebhookSignature(raw, signature, secret)) {
+    throw new AppError(400, 'PAYMENT_SIGNATURE_INVALID', 'The webhook signature is not valid');
+  }
+  if (!eventId) {
+    throw new AppError(400, 'VALIDATION_FAILED', 'X-Razorpay-Event-Id header is missing');
+  }
+
+  let event: RazorpayEvent;
+  try {
+    event = JSON.parse(raw.toString('utf8')) as RazorpayEvent;
+  } catch {
+    throw new AppError(400, 'VALIDATION_FAILED', 'The webhook body is not JSON');
+  }
+
+  const result = await withTransaction(deps.pool, async (tx): Promise<WebhookResult> => {
+    const { rowCount } = await tx.query(
+      `INSERT INTO payment_webhook_events (event_id, event_type, payload)
+       VALUES ($1, $2, $3::jsonb)
+       ON CONFLICT (event_id) DO NOTHING`,
+      [eventId, String(event.event), raw.toString('utf8')],
+    );
+    if (rowCount === 0) return 'duplicate_event';
+
+    const captured = capturedPaymentFrom(event);
+    // The request id travels into the outbox event and from there into every job.
+    if (captured) return applyCapturedPayment(tx, captured, { requestId: delivery.requestId });
+
+    const refund = refundUpdateFrom(event);
+    if (refund) return (await recordRefundState(tx, refund)) ? 'refund_updated' : 'ignored';
+    // payment.failed and anything else: stored, nothing to do. The booking
+    // stays PENDING_PAYMENT and the buyer can try again until the hold ends.
+    return 'ignored';
+  });
+
+  // Held seats became booked: still taken to everyone else, but their version moved.
+  if (typeof result === 'object' && result.kind === 'confirmed') {
+    await (deps.seatEvents ?? NO_SEAT_EVENTS).publishBookings([result.bookingId]);
+  }
+  log(deps.logger, eventId, String(event.event), result);
+  return result;
+}
+
 /**
  * POST /webhooks/razorpay. The only path that confirms a booking (besides the
  * reconciler in M3 PR 4): the browser is never trusted with that.
@@ -29,73 +94,19 @@ import { AppError } from '../../lib/errors';
  * 3. Answers 200 for every authentic event, including ones it ignores, so
  *    Razorpay stops retrying them.
  */
-export function razorpayWebhookRouter(deps: {
-  pool: Pool;
-  logger: Logger;
-  paymentWebhookSecret?: string;
-  seatEvents?: SeatEventPublisher;
-}): Router {
-  const seatEvents = deps.seatEvents ?? NO_SEAT_EVENTS;
+export function razorpayWebhookRouter(deps: WebhookDeps): Router {
   const router = Router();
 
   router.post(
     '/webhooks/razorpay',
     express.raw({ type: () => true, limit: '1mb' }),
     async (req, res) => {
-      const secret = deps.paymentWebhookSecret;
-      if (!secret) {
-        throw new AppError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Webhooks are not configured on this server',
-        );
-      }
-      const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-      const signature = req.get('X-Razorpay-Signature') ?? '';
-      if (!verifyWebhookSignature(raw, signature, secret)) {
-        throw new AppError(400, 'PAYMENT_SIGNATURE_INVALID', 'The webhook signature is not valid');
-      }
-      const eventId = req.get('X-Razorpay-Event-Id');
-      if (!eventId) {
-        throw new AppError(400, 'VALIDATION_FAILED', 'X-Razorpay-Event-Id header is missing');
-      }
-
-      let event: RazorpayEvent;
-      try {
-        event = JSON.parse(raw.toString('utf8')) as RazorpayEvent;
-      } catch {
-        throw new AppError(400, 'VALIDATION_FAILED', 'The webhook body is not JSON');
-      }
-
-      const result = await withTransaction(deps.pool, async (tx) => {
-        const { rowCount } = await tx.query(
-          `INSERT INTO payment_webhook_events (event_id, event_type, payload)
-           VALUES ($1, $2, $3::jsonb)
-           ON CONFLICT (event_id) DO NOTHING`,
-          [eventId, String(event.event), raw.toString('utf8')],
-        );
-        if (rowCount === 0) return 'duplicate_event' as const;
-
-        const captured = capturedPaymentFrom(event);
-        // The request id travels into the outbox event and from there into every job.
-        if (captured) return applyCapturedPayment(tx, captured, { requestId: String(req.id) });
-
-        const refund = refundUpdateFrom(event);
-        if (refund) {
-          return (await recordRefundState(tx, refund))
-            ? ('refund_updated' as const)
-            : ('ignored' as const);
-        }
-        // payment.failed and anything else: stored, nothing to do. The booking
-        // stays PENDING_PAYMENT and the buyer can try again until the hold ends.
-        return 'ignored' as const;
+      await handleRazorpayWebhook(deps, {
+        raw: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
+        signature: req.get('X-Razorpay-Signature') ?? '',
+        eventId: req.get('X-Razorpay-Event-Id'),
+        requestId: String(req.id),
       });
-
-      // Held seats became booked: still taken to everyone else, but their version moved.
-      if (typeof result === 'object' && result.kind === 'confirmed') {
-        await seatEvents.publishBookings([result.bookingId]);
-      }
-      log(deps.logger, eventId, String(event.event), result);
       res.json({ received: true });
     },
   );
@@ -103,12 +114,7 @@ export function razorpayWebhookRouter(deps: {
   return router;
 }
 
-function log(
-  logger: Logger,
-  eventId: string,
-  type: string,
-  result: CaptureOutcome | 'duplicate_event' | 'ignored' | 'refund_updated',
-): void {
+function log(logger: Logger, eventId: string, type: string, result: WebhookResult): void {
   if (typeof result === 'string') {
     logger.info({ eventId, type, result }, 'razorpay webhook');
   } else if (result.kind === 'refund' || result.kind === 'unknown_order') {

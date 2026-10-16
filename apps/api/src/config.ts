@@ -43,8 +43,17 @@ export const apiEnvSchema = baseEnvSchema
     ...razorpayEnvShape,
     /** The secret set on the webhook in the Razorpay Dashboard; without it webhooks answer 503. */
     RAZORPAY_WEBHOOK_SECRET: optionalEnv(z.string().min(1)),
+    /**
+     * `fake` pays without Razorpay (development and end-to-end tests); never allowed in
+     * production. Unset or `razorpay`: Razorpay when its keys are set, otherwise no payments.
+     */
+    PAYMENT_GATEWAY: optionalEnv(z.enum(['razorpay', 'fake'])),
   })
-  .refine(razorpayKeysPaired, RAZORPAY_PAIR_ISSUE);
+  .refine(razorpayKeysPaired, RAZORPAY_PAIR_ISSUE)
+  .refine((env) => !(env.PAYMENT_GATEWAY === 'fake' && env.NODE_ENV === 'production'), {
+    message: 'PAYMENT_GATEWAY=fake is not allowed when NODE_ENV=production',
+    path: ['PAYMENT_GATEWAY'],
+  });
 
 export type ApiConfig = z.output<typeof apiEnvSchema>;
 

@@ -67,4 +67,11 @@ describe('loadConfig', () => {
   it('rejects an out-of-range port', () => {
     expect(() => loadConfig({ ...valid, PORT: '70000' })).toThrow(/PORT/);
   });
+
+  it('accepts PAYMENT_GATEWAY=fake in development but never in production', () => {
+    expect(loadConfig({ ...valid, PAYMENT_GATEWAY: 'fake' }).PAYMENT_GATEWAY).toBe('fake');
+    expect(() => loadConfig({ ...valid, NODE_ENV: 'production', PAYMENT_GATEWAY: 'fake' })).toThrow(
+      /PAYMENT_GATEWAY/,
+    );
+  });
 });

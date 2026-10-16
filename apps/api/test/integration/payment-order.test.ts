@@ -215,15 +215,3 @@ describe('checking the checkout callback', () => {
     expect(res.body.error.code).toBe('VALIDATION_FAILED');
   });
 });
-
-describe('the dev checkout page', () => {
-  it('is served only when dev pages are on', async () => {
-    expect((await request(app).get('/dev/checkout')).status).toBe(404);
-
-    const dev = createApp({ ...deps, paymentGateway: gateway, devPages: true });
-    const res = await request(dev).get('/dev/checkout');
-    expect(res.status).toBe(200);
-    expect(res.type).toBe('text/html');
-    expect(res.text).toContain('checkout.razorpay.com');
-  });
-});

@@ -20,12 +20,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - The show page and the checkout open on a ticket in the movie's poster colour, so the look of the poster carries through to the countdown
 - The map stays live: it follows seat events, reloads on reconnect, `resync` or a gap the heartbeat exposes, and a seat someone else takes flashes once; a picked seat taken by someone else is dropped with a message
 - Holding handles every answer: seats just taken (dropped, map reloaded), a hold already open for the show, rate limiting, and signing in first (the picked seats wait in the tab and come back)
+- Paying in the web app: Razorpay Checkout, then a signature check and "Confirming your booking" until the webhook confirms it (up to 30 s), then the ticket; a payment that arrives after the hold ended explains the automatic refund
+- Fake payment mode (`PAYMENT_GATEWAY=fake`, never in production): a test sheet with Pay and Fail; it answers like Checkout and sends a signed webhook through the real handler a moment later, so bookings are still confirmed only by the webhook
+- Ticket page (`/bookings/:id`) with the booking reference and the PDF to download, and My bookings (`/bookings`): waiting for payment, coming up, watched and not booked
+- `GET /api/v1/bookings`: the signed-in user's bookings, newest first, with their show and seats
 - Live seat updates (ADR 0013): `GET /api/v1/shows/:id/seats/events` streams seat changes as Server-Sent Events (`ready`, `seats`, `heartbeat`, `resync`)
 - Every seat change publishes the seats' state after it commits, on the show's Redis channel: holds, releases, expiry by job, sweeper or a new hold, and payments confirmed by the webhook or the reconciler
 - One Redis subscription per show per replica, dropped when its last viewer leaves; a reconnected subscription tells its viewers to resync
 - The heartbeat carries the show's seat version, so a browser notices an event it never received; the seat map now includes each seat's `version`
 - Limits: opening a stream counts against the browse limit, and a replica keeps at most 6 streams open per IP
 - Tests: a hold on one replica seen on the other within a second, a release with a higher version, the worker's expiry reaching viewers on both replicas, a lost event exposed by the heartbeat, subscribe-once and unsubscribe, resync after the subscriber connection is killed, the stream limit, and the publisher surviving an unreachable Redis
+
+### Removed
+
+- `/dev/checkout`: the web app replaces it
 
 ## [0.6.0] - 2026-10-16
 

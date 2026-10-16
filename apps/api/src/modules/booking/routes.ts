@@ -70,6 +70,11 @@ export function bookingRouter(deps: {
     res.status(result.status).json(result.body);
   });
 
+  /** The signed-in user's bookings, newest first (My bookings). */
+  router.get('/bookings', signedIn, async (req, res) => {
+    res.json({ bookings: await bookings.list(req.auth!.user.id) });
+  });
+
   router.get('/bookings/:id', signedIn, async (req, res) => {
     const { id } = parseParams(bookingIdParam, req);
     res.json({ booking: await bookings.get(req.auth!.user.id, id) });

@@ -23,7 +23,7 @@ async processing and distributed rate limiting.
 - Payments with Razorpay: one order per booking (safe to retry, even after a crash); only a
   signed webhook or the reconciler confirms a booking, never the browser; late, duplicate and
   wrong-amount payments are refunded automatically, and refunds are retried until Razorpay settles
-  them. Pay by hand in test mode at `/dev/checkout`
+  them. Pay in the web app with Razorpay test mode or the fake payment mode
   ([runbook](docs/runbooks/payments-local.md))
 - Emails and tickets: a confirmed booking gets an email with a PDF ticket (QR code), and a refunded
   payment gets a notice with the reason. Every side effect goes through a transactional outbox, so

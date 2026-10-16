@@ -128,6 +128,11 @@ export function createBookingService(
       return (await repo.findBookingView(pool, booking.id, userId))!;
     },
 
+    /** The user's latest bookings, newest first. */
+    list(userId: string, limit = 50): Promise<repo.BookingSummary[]> {
+      return repo.listBookings(pool, userId, limit);
+    },
+
     async get(userId: string, bookingId: string): Promise<repo.BookingView> {
       const booking = await repo.findBookingView(pool, bookingId, userId);
       // Someone else's booking is "not found", so ids cannot be probed.

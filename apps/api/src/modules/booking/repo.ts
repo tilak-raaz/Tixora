@@ -132,3 +132,56 @@ export async function releaseSeats(db: Db, bookingId: string): Promise<void> {
     [bookingId],
   );
 }
+
+/** One of the user's bookings in their list, with what the list shows of its show. */
+export interface BookingSummary {
+  id: string;
+  showId: string;
+  status: string;
+  totalPaise: number;
+  expiresAt: Date;
+  createdAt: Date;
+  show: {
+    startsAt: string;
+    timezone: string;
+    movieTitle: string;
+    certificate: string;
+    theatre: string;
+    screen: string;
+  };
+  /** Seat labels such as "F7", in row order. */
+  seats: string[];
+}
+
+/** The user's bookings, newest first. Expired holds read as EXPIRED, as in findBookingView. */
+export async function listBookings(
+  db: Db,
+  userId: string,
+  limit: number,
+): Promise<BookingSummary[]> {
+  const { rows } = await db.query<BookingSummary>(
+    `SELECT b.id, b.show_id AS "showId",
+            CASE WHEN b.status = 'PENDING_PAYMENT' AND b.expires_at <= now()
+                 THEN 'EXPIRED' ELSE b.status END AS status,
+            b.total_paise AS "totalPaise", b.expires_at AS "expiresAt", b.created_at AS "createdAt",
+            json_build_object(
+              'startsAt', sh.starts_at, 'timezone', c.timezone, 'movieTitle', m.title,
+              'certificate', m.certificate, 'theatre', t.name, 'screen', sc.name) AS show,
+            (SELECT coalesce(json_agg(s.row_label || s.seat_number ORDER BY s.row_label, s.seat_number), '[]')
+             FROM booking_seats bs
+             JOIN show_seats ss ON ss.id = bs.show_seat_id
+             JOIN seats s ON s.id = ss.seat_id
+             WHERE bs.booking_id = b.id) AS seats
+     FROM bookings b
+     JOIN shows sh ON sh.id = b.show_id
+     JOIN movies m ON m.id = sh.movie_id
+     JOIN screens sc ON sc.id = sh.screen_id
+     JOIN theatres t ON t.id = sc.theatre_id
+     JOIN cities c ON c.id = t.city_id
+     WHERE b.user_id = $1
+     ORDER BY b.created_at DESC
+     LIMIT $2`,
+    [userId, limit],
+  );
+  return rows;
+}
