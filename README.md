@@ -41,7 +41,7 @@ async processing and distributed rate limiting.
 
 ## Stack
 
-TypeScript (strict) on Node.js 24 · Express 5 · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ · Razorpay · Resend · PDFKit ·
+TypeScript (strict) on Node.js 24 · Express 5 · Next.js (App Router) · Tailwind CSS · Better Auth · PostgreSQL 17 with raw SQL via `pg` · Redis 7 · BullMQ · Razorpay · Resend · PDFKit ·
 Zod · pino · Vitest + Testcontainers · Docker Compose · GitHub Actions
 
 ## Quickstart
@@ -57,6 +57,7 @@ make create-admin  # admin account from ADMIN_* in .env
 make seed          # demo city, theatres, movies and a week of shows
 make dev-api     # http://localhost:4000/readyz
 make dev-worker  # hold expiry (second terminal)
+make dev-web     # http://localhost:3000 (third terminal)
 make test        # unit + integration (starts its own containers)
 ```
 
@@ -69,6 +70,7 @@ When an email or refund is missing: [docs/runbooks/queues.md](docs/runbooks/queu
 ```text
 apps/api          Express API (modules mount under /api/v1)
 apps/worker       Background jobs: outbox relay, email, hold expiry, reconciliation
+apps/web          Next.js frontend; /api/* is forwarded to the API (one origin)
 packages/jobs     Background jobs (BullMQ queues and their SQL), shared by API and worker
 packages/payments Razorpay client, a fake for tests, signature checks
 packages/platform Server-side building blocks: env, logger, Postgres, Redis, migrations

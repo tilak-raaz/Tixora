@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+
+/* Fonts come from next/font in layout.tsx as CSS variables on <html>. */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Design tokens: the only colours the UI uses. */
+@theme {
+  --color-primary: #c8102e;
+  --color-primary-hover: #a50d25;
+  --color-primary-soft: #fde8eb;
+
+  --color-ink: #141416;
+  --color-muted: #8a8a93;
+  --color-line: #e6e6ea;
+  --color-surface: #f3f3f5;
+  --color-card: #ffffff;
+
+  --color-info: #2453c4;
+  --color-info-soft: #dce8ff;
+  --color-success: #1d7a3c;
+  --color-success-soft: #ddf5e3;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #fff1d6;
+
+  --radius-card: 1.5rem;
+}
+
+/* Unavailable seats: diagonal hatching, so the state does not depend on colour alone. */
+@utility bg-hatch {
+  background-color: var(--color-surface);
+  background-image: repeating-linear-gradient(135deg, var(--color-line) 0 2px, transparent 2px 6px);
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-primary-soft);
+  }
+}

@@ -34,6 +34,7 @@ Razorpay ──webhooks──┘                      ▼
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | `apps/api`          | HTTP layer. Each module in `src/modules/<name>/` has `routes`, `service`, `repo`, `schemas`  |
 | `apps/worker`       | Queue consumers, outbox relay, hold-expiry sweeper, payment reconciler                       |
+| `apps/web`          | Next.js App Router frontend; reaches the API on the same origin through `/api/*` (ADR 0012)  |
 | `packages/jobs`     | Queues, their consumers, the outbox relay and the periodic sweepers                          |
 | `packages/payments` | Razorpay client over `fetch`, an in-memory fake with the same interface, signature checks    |
 | `packages/platform` | Server-only building blocks: env parsing, logger, Postgres pool, Redis, migrations, shutdown |
