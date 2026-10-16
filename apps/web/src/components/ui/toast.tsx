@@ -61,7 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl bg-ink px-4 py-3 text-white shadow-lg"
+            className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg bg-ink px-4 py-3 text-white"
           >
             <span
               aria-hidden

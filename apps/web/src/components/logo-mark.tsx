@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn';
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" aria-hidden className={cn('size-8', className)}>
-      <rect width="32" height="32" rx="8" className="fill-primary" />
+      <rect width="32" height="32" rx="6" className="fill-primary" />
       <path
         d="M8 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2.5a2.5 2.5 0 0 0 0 5V21a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.5a2.5 2.5 0 0 0 0-5Z"
         fill="#fff"

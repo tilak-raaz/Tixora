@@ -8,15 +8,15 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-white hover:bg-primary-hover',
-  secondary: 'border border-line bg-card text-ink hover:bg-surface',
+  secondary: 'bg-card text-ink ring-1 ring-line ring-inset hover:ring-ink',
   dark: 'bg-ink text-white hover:bg-ink/85',
   ghost: 'text-ink hover:bg-ink/5',
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'h-9 px-4 text-sm',
+  sm: 'h-9 px-3.5 text-sm',
   md: 'h-11 px-5 text-sm',
-  lg: 'h-13 px-6 text-base',
+  lg: 'h-12 px-6 text-base',
 };
 
 export function buttonClasses(
@@ -25,7 +25,7 @@ export function buttonClasses(
   className?: string,
 ): string {
   return cn(
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap',
+    'inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-semibold whitespace-nowrap',
     'transition-colors disabled:pointer-events-none disabled:opacity-50',
     VARIANTS[variant],
     SIZES[size],

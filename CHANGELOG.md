@@ -11,6 +11,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - One origin for the browser: `/api/*` is forwarded to the API, so the session cookie is first-party and there is no CORS
 - Typed `api()` client that turns every error response into an `ApiError` carrying the API's error code and `Retry-After`; Better Auth's React client for sessions
 - `make dev-web` and `make build-web`; CI and `make check` now build the web app
+- Browse pages: now showing in a city by date (city remembered in a cookie), a movie with its shows grouped by theatre, and a show's details and prices; times are shown in the city's time zone
+- Sign-in and sign-up pages with Better Auth, returning to the page you came from (same-site paths only)
+- Ticket-stub design: movie cards, dates and show times are tickets with a perforated tear line and notched stubs; Anton for headlines and poster titles, Schibsted Grotesk for text; the city picker lives in the header
+- Typographic posters (flat palette colour, frame, rating box, title in poster type) for movies without an image; loading, empty, error and 404 states
+- Server-rendered pages pass the visitor's address to the API in `X-Forwarded-For` (last proxy entry only), so per-IP browse limits stay per visitor
 
 ## [0.6.0] - 2026-10-16
 
