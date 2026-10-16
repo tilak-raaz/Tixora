@@ -4,3 +4,4 @@ export * from './db';
 export * from './redis';
 export * from './migrate';
 export * from './process';
+export * from './outbox';

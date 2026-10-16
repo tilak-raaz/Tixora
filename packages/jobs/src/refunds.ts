@@ -10,19 +10,16 @@ import {
 import type { Logger, Pool } from '@bmt/platform';
 import { Queue, Worker } from 'bullmq';
 import { QUEUE_PREFIX, queueConnection, type QueueOptions } from './connection';
-import { startPeriodic, withTimeout, type Periodic } from './periodic';
+import { startPeriodic, type Periodic } from './periodic';
 
 /**
- * Refunds and the reconciler (ADR 0007). A refund is recorded in Postgres in
- * the transaction that decides a payment cannot be applied; this module gets
- * it to Razorpay:
- *
- * 1. A job per refund, queued right after that transaction commits (by the
- *    API for webhooks, by the reconciler for its own finds), retried with
- *    backoff while Razorpay is unreachable.
- * 2. A sweeper that re-queues refunds still PENDING after a while: a job that
- *    was lost, ran out of retries, or found Razorpay still processing. Money
- *    owed is retried until Razorpay settles it.
+ * Refunds and the reconciler (ADR 0007, ADR 0008). A refund is recorded in
+ * Postgres, with a refund.recorded outbox event, in the transaction that
+ * decides a payment cannot be applied. The relay turns that event into a job
+ * here, which gets the refund to Razorpay, retried with backoff while Razorpay
+ * is unreachable. A sweeper re-queues refunds still PENDING after a while: a
+ * job whose retries ran out, or one that found Razorpay still processing.
+ * Money owed is retried until Razorpay settles it.
  *
  * Sending twice is harmless (our refund id is the Razorpay receipt), so the
  * job and the sweeper may overlap.
@@ -31,8 +28,11 @@ import { startPeriodic, withTimeout, type Periodic } from './periodic';
 export const REFUND_QUEUE = 'refunds';
 const JOB_NAME = 'send';
 
+/** From the relay: the refund.recorded payload plus the outbox id; from the sweeper: refundId alone. */
 export interface RefundJobData {
   refundId: string;
+  outboxId?: string;
+  requestId?: string | null;
 }
 
 export type RefundQueue = Queue<RefundJobData, RefundResult, typeof JOB_NAME>;
@@ -48,28 +48,6 @@ export function createRefundQueue(redisUrl: string, opts: QueueOptions = {}): Re
       removeOnFail: { age: 7 * 24 * 60 * 60 },
     },
   });
-}
-
-export interface RefundScheduler {
-  /** Queues a refund that has just been recorded. Never throws; the sweeper is the fallback. */
-  schedule(refundId: string): Promise<void>;
-}
-
-export function createRefundScheduler(
-  queue: RefundQueue,
-  logger: Logger,
-  opts: { timeoutMs?: number } = {},
-): RefundScheduler {
-  const { timeoutMs = 1_000 } = opts;
-  return {
-    async schedule(refundId) {
-      try {
-        await withTimeout(queue.add(JOB_NAME, { refundId }, { jobId: refundId }), timeoutMs);
-      } catch (err) {
-        logger.warn({ err, refundId }, 'could not queue refund; the sweeper will send it');
-      }
-    },
-  };
 }
 
 export type RefundWorker = Worker<RefundJobData, RefundResult, typeof JOB_NAME>;
@@ -128,9 +106,12 @@ export function startRefundSweeper(
   );
 }
 
-/** Runs the reconciler every `intervalMs` and queues the refunds it records. */
+/**
+ * Runs the reconciler every `intervalMs`. Refunds it records reach Razorpay
+ * through the outbox, like every other refund.
+ */
 export function startReconciler(
-  deps: { pool: Pool; gateway: PaymentGateway; refunds: RefundScheduler; logger: Logger },
+  deps: { pool: Pool; gateway: PaymentGateway; logger: Logger },
   opts: { intervalMs: number } & Partial<ReconcileOptions>,
 ): Periodic {
   const options: ReconcileOptions = { ...DEFAULT_RECONCILE_OPTIONS, ...opts };
@@ -138,9 +119,6 @@ export function startReconciler(
     'reconcile',
     async () => {
       const report = await reconcileOnce(deps.pool, deps.gateway, options);
-      for (const outcome of report.outcomes) {
-        if (outcome.kind === 'refund') await deps.refunds.schedule(outcome.refundId);
-      }
       if (report.outcomes.length > 0 || report.failed > 0) {
         deps.logger.warn(
           {

@@ -1,4 +1,4 @@
-import type { PoolClient } from '@bmt/platform';
+import { writeOutbox, type PoolClient } from '@bmt/platform';
 
 /**
  * Applying a payment Razorpay has captured. The webhook calls this, and from
@@ -8,6 +8,8 @@ import type { PoolClient } from '@bmt/platform';
  * - A payment is recorded once, by its Razorpay id: a redelivered webhook, or
  *   the same payment reported by both payment.captured and order.paid, finds
  *   its row and changes nothing.
+ * - Whatever it decides is announced in the outbox, in the same transaction:
+ *   booking.confirmed, or refund.recorded (ADR 0008).
  * - It confirms the booking only while the hold is still active and every one
  *   of the booking's seats is still held by it. Anything else is refunded in
  *   full: a payment after the hold ended, a second payment of the same order,
@@ -34,10 +36,14 @@ export type CaptureOutcome =
   /** Not an order this app created (another integration on the same account); ignored. */
   | { kind: 'unknown_order' };
 
-/** Must run inside the caller's transaction; the outcome commits or rolls back with it. */
+/**
+ * Must run inside the caller's transaction; the outcome, and the outbox event
+ * announcing it, commit or roll back with it.
+ */
 export async function applyCapturedPayment(
   tx: PoolClient,
   payment: CapturedPayment,
+  context: { requestId?: string } = {},
 ): Promise<CaptureOutcome> {
   const { rows: orders } = await tx.query<{ id: string; bookingId: string; amountPaise: number }>(
     `SELECT id, booking_id AS "bookingId", amount_paise AS "amountPaise"
@@ -65,12 +71,19 @@ export async function applyCapturedPayment(
   if (!paymentId) return { kind: 'already_recorded', bookingId };
 
   const refund = async (reason: RefundReason): Promise<CaptureOutcome> => {
-    // M3 PR 4: the refund job sends PENDING refunds to Razorpay.
     const { rows } = await tx.query<{ id: string }>(
       'INSERT INTO refunds (payment_id, amount_paise, reason) VALUES ($1, $2, $3) RETURNING id',
       [paymentId, payment.amountPaise, reason],
     );
-    return { kind: 'refund', bookingId, paymentId, refundId: rows[0]!.id, reason };
+    const refundId = rows[0]!.id;
+    // The relay turns this into the refund job (sent to Razorpay) and the email.
+    await writeOutbox(
+      tx,
+      'refund.recorded',
+      { refundId, bookingId, reason },
+      { aggregateId: refundId, requestId: context.requestId },
+    );
+    return { kind: 'refund', bookingId, paymentId, refundId, reason };
   };
 
   if (payment.amountPaise !== order.amountPaise || payment.currency !== 'INR') {
@@ -99,6 +112,11 @@ export async function applyCapturedPayment(
     bookingId,
   ]);
   await tx.query('UPDATE payments SET applied = true WHERE id = $1', [paymentId]);
-  // M4: the BookingConfirmed outbox row is written here, in this same transaction.
+  await writeOutbox(
+    tx,
+    'booking.confirmed',
+    { bookingId },
+    { aggregateId: bookingId, requestId: context.requestId },
+  );
   return { kind: 'confirmed', bookingId, paymentId };
 }

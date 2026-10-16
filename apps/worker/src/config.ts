@@ -23,6 +23,8 @@ const workerEnvSchema = baseEnvSchema
     HOLD_SWEEP_BATCH_SIZE: z.coerce.number().int().min(1).max(10_000).default(500),
     /** Without Razorpay keys the worker runs hold expiry only: no refunds, no reconciler. */
     ...razorpayEnvShape,
+    /** How often the relay polls the outbox for committed events (ADR 0008). */
+    OUTBOX_RELAY_INTERVAL_MS: z.coerce.number().int().min(50).default(500),
     /** How often refunds still PENDING are re-queued (ADR 0007). */
     REFUND_SWEEP_INTERVAL_MS: z.coerce
       .number()
