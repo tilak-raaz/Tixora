@@ -7,7 +7,7 @@ import {
   type ReconcileOptions,
   type RefundResult,
 } from '@bmt/payments';
-import type { Logger, Pool } from '@bmt/platform';
+import type { Logger, Pool, SeatEventPublisher } from '@bmt/platform';
 import { Queue, Worker } from 'bullmq';
 import { QUEUE_PREFIX, queueConnection, type QueueOptions } from './connection';
 import { startPeriodic, type Periodic } from './periodic';
@@ -111,7 +111,13 @@ export function startRefundSweeper(
  * through the outbox, like every other refund.
  */
 export function startReconciler(
-  deps: { pool: Pool; gateway: PaymentGateway; logger: Logger },
+  deps: {
+    pool: Pool;
+    gateway: PaymentGateway;
+    logger: Logger;
+    /** Announces seats of bookings it confirms (ADR 0013). */
+    seatEvents?: SeatEventPublisher;
+  },
   opts: { intervalMs: number } & Partial<ReconcileOptions>,
 ): Periodic {
   const options: ReconcileOptions = { ...DEFAULT_RECONCILE_OPTIONS, ...opts };
@@ -119,6 +125,10 @@ export function startReconciler(
     'reconcile',
     async () => {
       const report = await reconcileOnce(deps.pool, deps.gateway, options);
+      const confirmed = report.outcomes.flatMap((o) =>
+        o.kind === 'confirmed' ? [o.bookingId] : [],
+      );
+      await deps.seatEvents?.publishBookings(confirmed);
       if (report.outcomes.length > 0 || report.failed > 0) {
         deps.logger.warn(
           {

@@ -4,6 +4,7 @@ import {
   createLogger,
   createPool,
   createRedis,
+  createSeatEventPublisher,
   installProcessHandlers,
   loadEnvFile,
 } from '@bmt/platform';
@@ -12,6 +13,7 @@ import { createCache } from './lib/cache';
 import { DEFAULT_RATE_LIMITS } from './lib/rate-limit';
 import { authConfigFrom, bookingConfigFrom, loadConfig, razorpayConfigFrom } from './config';
 import { createAuth } from './modules/auth/auth';
+import { createSeatEventHub } from './modules/live/hub';
 import { ENV_FILE } from './paths';
 
 loadEnvFile(ENV_FILE);
@@ -36,6 +38,10 @@ const razorpay = razorpayConfigFrom(config);
 if (!razorpay)
   logger.warn('RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not set: payment endpoints answer 503');
 
+// Live seat maps (ADR 0013): announce this replica's seat changes, forward everyone's.
+const seatEvents = createSeatEventPublisher({ pool, redis, logger });
+const seatEventHub = createSeatEventHub({ pool, redis, logger });
+
 const holdExpiryQueue = createHoldExpiryQueue(config.REDIS_URL);
 holdExpiryQueue.on('error', (err) => logger.error({ err }, 'hold expiry queue error'));
 
@@ -54,6 +60,8 @@ const app = createApp({
     config.CATALOG_CACHE_TTL_SECONDS > 0
       ? createCache(redis, logger, { ttlSeconds: config.CATALOG_CACHE_TTL_SECONDS })
       : undefined,
+  seatEvents,
+  seatEventHub,
 });
 
 const server = app.listen(config.PORT, (err?: Error) => {
@@ -68,11 +76,15 @@ installProcessHandlers({
   logger,
   timeoutMs: config.SHUTDOWN_TIMEOUT_MS,
   close: async () => {
-    // 1. Stop accepting connections and wait for in-flight requests to finish.
-    await new Promise<void>((resolve, reject) => {
+    // 1. Stop accepting connections; in-flight requests carry on.
+    const drained = new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });
-    // 2. Only then close the connections those requests were using.
+    // 2. End the live seat streams: they never finish on their own, so the server would wait for
+    //    them forever. Browsers reconnect by themselves, to another replica behind nginx.
+    await seatEventHub.close();
+    await drained;
+    // 3. Only then close the connections those requests were using.
     await Promise.all([pool.end(), redis.quit(), holdExpiryQueue.close()]);
   },
 });

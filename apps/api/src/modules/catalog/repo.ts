@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from '@bmt/platform';
+import { SEAT_IS_FREE, type Pool, type PoolClient } from '@bmt/platform';
 
 /** Repo functions run on the pool or inside a transaction's client. */
 type Db = Pool | PoolClient;
@@ -164,11 +164,8 @@ export async function insertShowSeats(db: Db, showId: string, screenId: string):
 
 // ---------- reads ----------
 
-/**
- * A seat is free if it is AVAILABLE or its hold has run out. Expired holds are
- * released by the sweeper in M2; until it runs they must not look taken.
- */
-const SEAT_IS_FREE = `(ss.status = 'AVAILABLE' OR (ss.status = 'HELD' AND ss.held_until <= now()))`;
+// SEAT_IS_FREE (@bmt/platform): available, or held by a hold whose time is up. The live seat
+// events use the same expression, so the map and the events always agree.
 
 /**
  * Shows that start on a calendar date in the city's time zone ($date, or today
@@ -275,13 +272,15 @@ export async function findShow(db: Db, showId: string) {
 
 /**
  * The seat map. Clients only learn AVAILABLE or UNAVAILABLE: whether a taken
- * seat is held or booked, and by whom, is nobody else's business.
+ * seat is held or booked, and by whom, is nobody else's business. `version`
+ * lets a client merge this snapshot with live seat events: the higher one wins.
  */
 export async function listSeatMap(db: Db, showId: string) {
   const { rows } = await db.query(
     `SELECT ss.id, s.row_label AS row, s.seat_number AS number, s.grid_x AS x, s.grid_y AS y,
             cat.name AS category, ss.price_paise AS "pricePaise",
-            CASE WHEN ${SEAT_IS_FREE} THEN 'AVAILABLE' ELSE 'UNAVAILABLE' END AS status
+            CASE WHEN ${SEAT_IS_FREE} THEN 'AVAILABLE' ELSE 'UNAVAILABLE' END AS status,
+            ss.version
      FROM show_seats ss
      JOIN seats s ON s.id = ss.seat_id
      JOIN seat_categories cat ON cat.id = s.category_id

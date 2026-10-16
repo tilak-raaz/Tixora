@@ -1,6 +1,6 @@
 import type { HoldExpiryScheduler } from '@bmt/jobs';
 import type { PaymentGateway } from '@bmt/payments';
-import type { Logger, Pool, Redis } from '@bmt/platform';
+import type { Logger, Pool, Redis, SeatEventPublisher } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
 import { devRouter } from './dev/routes';
@@ -20,6 +20,8 @@ import { authRouter } from './modules/auth/routes';
 import { bookingRouter } from './modules/booking/routes';
 import type { BookingConfig } from './modules/booking/service';
 import { adminCatalogRouter, catalogRouter } from './modules/catalog/routes';
+import type { SeatEventHub } from './modules/live/hub';
+import { liveRouter } from './modules/live/routes';
 import { paymentRouter } from './modules/payment/routes';
 import type { PaymentConfig } from './modules/payment/service';
 import { razorpayWebhookRouter } from './modules/payment/webhook';
@@ -48,6 +50,12 @@ export interface AppDeps {
   rateLimits?: { policies: RateLimitPolicies; limiter?: RateLimiter };
   /** Catalog read cache; without it every read goes to Postgres (most tests). */
   cache?: Cache;
+  /** Announces seat changes for live seat maps (ADR 0013); without it nothing is announced. */
+  seatEvents?: SeatEventPublisher;
+  /** Serves GET /shows/:id/seats/events; without it that endpoint answers 503. */
+  seatEventHub?: SeatEventHub;
+  /** Live seat maps one address may keep open on this replica (default 6). */
+  seatStreamsPerIp?: number;
 }
 
 /**
@@ -92,6 +100,7 @@ export function createApp(deps: AppDeps): Express {
   const v1 = Router();
   v1.use(authRouter(deps));
   v1.use(catalogRouter(routerDeps));
+  v1.use(liveRouter(routerDeps));
   v1.use(bookingRouter(routerDeps));
   v1.use(paymentRouter(routerDeps));
   v1.use('/admin', adminCatalogRouter(routerDeps));

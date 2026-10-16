@@ -17,19 +17,23 @@ export async function findShowForHold(
  * Expires this user's own pending booking for the show if its hold has run out,
  * and frees its seats, so an old hold never blocks a new one. (The sweeper in
  * the worker does the same for everyone in the background, see @bmt/jobs.)
+ * Returns the ids of the bookings it expired.
  */
-export async function expireStaleHold(db: Db, userId: string, showId: string): Promise<void> {
-  await db.query(
+export async function expireStaleHold(db: Db, userId: string, showId: string): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
     `WITH expired AS (
        UPDATE bookings SET status = 'EXPIRED'
        WHERE user_id = $1 AND show_id = $2 AND status = 'PENDING_PAYMENT' AND expires_at <= now()
        RETURNING id
+     ), freed AS (
+       UPDATE show_seats
+       SET status = 'AVAILABLE', booking_id = NULL, held_until = NULL, version = version + 1
+       WHERE booking_id IN (SELECT id FROM expired) AND status = 'HELD'
      )
-     UPDATE show_seats
-     SET status = 'AVAILABLE', booking_id = NULL, held_until = NULL, version = version + 1
-     WHERE booking_id IN (SELECT id FROM expired) AND status = 'HELD'`,
+     SELECT id FROM expired`,
     [userId, showId],
   );
+  return rows.map((r) => r.id);
 }
 
 /** Prices of the requested seats that belong to this show. */

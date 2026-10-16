@@ -1,4 +1,10 @@
-import { withTransaction, type Logger, type Pool } from '@bmt/platform';
+import {
+  NO_SEAT_EVENTS,
+  withTransaction,
+  type Logger,
+  type Pool,
+  type SeatEventPublisher,
+} from '@bmt/platform';
 import {
   applyCapturedPayment,
   capturedPaymentFrom,
@@ -27,7 +33,9 @@ export function razorpayWebhookRouter(deps: {
   pool: Pool;
   logger: Logger;
   paymentWebhookSecret?: string;
+  seatEvents?: SeatEventPublisher;
 }): Router {
+  const seatEvents = deps.seatEvents ?? NO_SEAT_EVENTS;
   const router = Router();
 
   router.post(
@@ -83,6 +91,10 @@ export function razorpayWebhookRouter(deps: {
         return 'ignored' as const;
       });
 
+      // Held seats became booked: still taken to everyone else, but their version moved.
+      if (typeof result === 'object' && result.kind === 'confirmed') {
+        await seatEvents.publishBookings([result.bookingId]);
+      }
       log(deps.logger, eventId, String(event.event), result);
       res.json({ received: true });
     },
