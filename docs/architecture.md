@@ -129,6 +129,10 @@ migrate (one-shot) ──▶ exits 0 ──▶ api replicas and workers start
 nginx sets the client address at the edge; server rendering forwards it through the internal port,
 so per-IP limits hold on every path ([ADR 0014](adr/0014-full-stack-behind-nginx.md)).
 
+Every replica and worker serves its own `/metrics` (request latency by route, hold outcomes, open
+seat streams, pool use, jobs, backlog), reachable only inside the stack; `make stack-metrics`
+puts them side by side ([ADR 0015](adr/0015-metrics-per-process.md)).
+
 ## Life of a payment
 
 ```text

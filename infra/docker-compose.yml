@@ -126,10 +126,24 @@ services:
       <<: *server-env
       MAILER: smtp
       SMTP_URL: smtp://mailpit:1025
+      METRICS_PORT: 9100
     # Two workers share the queues; BullMQ hands each job to one of them.
     deploy:
       replicas: 2
     stop_grace_period: 15s
+    # The worker's metrics server (ADR 0015) doubles as its liveness check.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:9100/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -3,7 +3,7 @@ COMPOSE = docker compose -f infra/docker-compose.yml
 STACK = $(COMPOSE) $(if $(DEMO),-f infra/docker-compose.demo.yml,) --profile full
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-warm stack-e2e test test-unit test-integration e2e lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-warm stack-metrics stack-e2e test test-unit test-integration e2e lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -71,6 +71,9 @@ stack-logs: ## Follow the stack's logs (nginx's show which replica answered each
 
 stack-ps: ## Show the stack's containers and their health
 	$(STACK) ps
+
+stack-metrics: ## Each API replica's and worker's metrics side by side (ROUTES=1: busiest routes too)
+	node infra/scripts/metrics.mjs $(if $(ROUTES),--routes,)
 
 stack-warm: ## Wait until the stack answers at normal speed, not just healthy (before tests and load runs)
 	infra/scripts/warm-up.sh http://localhost:8080

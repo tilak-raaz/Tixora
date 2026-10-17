@@ -1,5 +1,6 @@
 import {
   createEmailQueue,
+  createHoldExpiryQueue,
   createEmailWorker,
   createHoldExpiryWorker,
   createRefundQueue,
@@ -8,16 +9,20 @@ import {
   startOutboxRelay,
   startReconciler,
   startRefundSweeper,
+  registerWorkerMetrics,
+  type AnyWorker,
   type Periodic,
 } from '@bmt/jobs';
 import { createRazorpayGateway } from '@bmt/payments';
 import {
   createLogger,
+  createMetricsRegistry,
   createPool,
   createRedis,
   createSeatEventPublisher,
   installProcessHandlers,
   loadEnvFile,
+  startMetricsServer,
 } from '@bmt/platform';
 import { ENV_FILE, loadConfig, mailerFrom, razorpayConfigFrom } from './config';
 
@@ -77,6 +82,8 @@ const sweeper = startHoldSweeper(
 const queues = ['hold-expiry'];
 const periodic: Periodic[] = [sweeper];
 const closers: (() => Promise<void>)[] = [() => holdExpiry.close()];
+/** The BullMQ workers whose jobs the metrics count. */
+const observed: AnyWorker[] = [holdExpiry];
 
 // The relay always runs: committed events are queued even while their
 // consumers are missing (no Razorpay keys, or the email consumer before PR 2).
@@ -94,6 +101,7 @@ periodic.push(
 
 const mailer = mailerFrom(config);
 const emailWorker = createEmailWorker({ redisUrl: config.REDIS_URL, pool, mailer, logger });
+observed.push(emailWorker);
 closers.push(
   () => emailWorker.close(),
   async () => mailer.close?.(),
@@ -104,6 +112,7 @@ const razorpay = razorpayConfigFrom(config);
 if (razorpay) {
   const gateway = createRazorpayGateway(razorpay);
   const refundWorker = createRefundWorker({ redisUrl: config.REDIS_URL, pool, gateway, logger });
+  observed.push(refundWorker);
   periodic.push(
     startRefundSweeper(
       { pool, queue: refundQueue, logger },
@@ -123,6 +132,26 @@ closers.push(
   () => emailQueue.close(),
   () => refundQueue.close(),
 );
+
+// Metrics (ADR 0015): this worker's jobs, plus queue depth and outbox lag read at scrape time.
+if (config.METRICS_PORT > 0) {
+  const holdExpiryQueue = createHoldExpiryQueue(config.REDIS_URL);
+  holdExpiryQueue.on('error', (err) => logger.error({ err }, 'hold expiry queue error'));
+  const registry = createMetricsRegistry({ service: 'worker', pool });
+  registerWorkerMetrics({
+    registry,
+    pool,
+    logger,
+    workers: observed,
+    queues: [holdExpiryQueue, emailQueue, refundQueue],
+  });
+  const metricsServer = await startMetricsServer({ port: config.METRICS_PORT, registry, logger });
+  closers.push(
+    () => metricsServer.close(),
+    () => holdExpiryQueue.close(),
+  );
+  logger.info({ port: metricsServer.port }, 'worker metrics listening');
+}
 
 stopConsumers = async () => {
   // Stop polling first, then let in-flight jobs finish, then drop the queues.

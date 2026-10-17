@@ -46,6 +46,8 @@ const workerEnvSchema = baseEnvSchema
       .default(2 * 60_000),
     /** The API's PAYMENT_GATEWAY: with `fake`, payments never reached Razorpay, so neither do refunds. */
     PAYMENT_GATEWAY: optionalEnv(z.enum(['razorpay', 'fake'])),
+    /** GET /metrics and /healthz for this worker (ADR 0015); 0 turns the server off. */
+    METRICS_PORT: z.coerce.number().int().min(0).max(65_535).default(9100),
   })
   .refine(razorpayKeysPaired, RAZORPAY_PAIR_ISSUE)
   .refine((c) => c.MAILER !== 'resend' || Boolean(c.RESEND_API_KEY), {

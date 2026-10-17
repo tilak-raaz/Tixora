@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- Metrics (ADR 0015): every API replica serves `GET /metrics` and every worker serves it on `METRICS_PORT` (9100, also its health check), in the Prometheus text format with `service` and `instance` labels. Request latency by route pattern and status, hold outcomes (held, rejected early by the Redis pre-lock, seat taken in Postgres, refused, error), open seat streams, the Postgres pool, jobs per queue, queue depth and outbox lag, and Node's own (CPU, memory, event loop lag). nginx does not route them
+- `make stack-metrics` (`ROUTES=1` for the busiest routes): every replica's and worker's numbers side by side, read from inside the containers
+
+### Added
+
 - Full stack in containers (ADR 0014): `make stack` starts nginx at http://localhost:8080 in front of 3 API replicas, 2 workers and the Next.js server, after a one-shot `migrate` job, on the same Postgres and Redis as `make up`. `DEMO=1` adds fake payments; otherwise the containers run as production
 - nginx: `least_conn` across the replicas found through Docker's DNS (so seat streams count and restarted replicas are followed), unbuffered seat streams, a request ID passed to the API, JSON access logs naming the replica, the client address set at the edge and carried through server rendering on an internal port
 - Images: one server image for the API, worker and scripts (production dependencies, run through tsx), and the web app as a Next.js standalone server

@@ -4,6 +4,7 @@ import type { Logger, Pool, Redis, SeatEventPublisher } from '@bmt/platform';
 import { Router } from 'express';
 import { AppError } from '../../lib/errors';
 import { hashRequest, idempotent } from '../../lib/idempotency';
+import type { ApiMetrics } from '../../lib/metrics';
 import { NO_LIMITS, type RouteLimits } from '../../lib/rate-limit';
 import { parseBody, parseParams } from '../../lib/validate';
 import type { Auth } from '../auth/auth';
@@ -22,6 +23,7 @@ export function bookingRouter(deps: {
   holdExpiry?: HoldExpiryScheduler;
   seatEvents?: SeatEventPublisher;
   limits?: RouteLimits;
+  metrics?: Pick<ApiMetrics, 'holdOutcome'>;
 }): Router {
   const config = deps.booking ?? DEFAULT_BOOKING_CONFIG;
   const bookings = createBookingService(
@@ -30,6 +32,7 @@ export function bookingRouter(deps: {
     createStrategy(config.strategy, deps),
     deps.holdExpiry,
     deps.seatEvents,
+    deps.metrics?.holdOutcome,
   );
   const holdSchema = createHoldSchema(config.maxSeatsPerBooking);
   const router = Router();

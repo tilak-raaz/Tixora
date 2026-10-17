@@ -1,6 +1,7 @@
 import type { HoldExpiryScheduler } from '@bmt/jobs';
 import { NO_SEAT_EVENTS, withTransaction, type Pool, type SeatEventPublisher } from '@bmt/platform';
 import { AppError, NotFoundError } from '../../lib/errors';
+import type { HoldOutcome } from '../../lib/metrics';
 import { isPgError, PG_UNIQUE_VIOLATION } from '../../lib/pg-errors';
 import * as repo from './repo';
 import type { HoldInput } from './schemas';
@@ -29,6 +30,7 @@ export type BookingService = ReturnType<typeof createBookingService>;
  * `expiry` queues the job that releases a hold when it runs out; without it
  * (tests, the benchmark) the worker's sweeper still releases it.
  * `seatEvents` tells everyone watching the show which seats changed (ADR 0013).
+ * `onHoldOutcome` hears how each hold attempt ended, for metrics (ADR 0015).
  */
 export function createBookingService(
   pool: Pool,
@@ -36,6 +38,7 @@ export function createBookingService(
   strategy: SeatHoldStrategy = conditionalStrategy,
   expiry?: HoldExpiryScheduler,
   seatEvents: SeatEventPublisher = NO_SEAT_EVENTS,
+  onHoldOutcome: (outcome: HoldOutcome) => void = () => {},
 ) {
   /** The hold transaction: everything except the optional pre-lock. */
   async function holdInDatabase(
@@ -94,6 +97,38 @@ export function createBookingService(
     });
   }
 
+  /** Pre-lock (if the strategy has one), the hold transaction, then the job and the event. */
+  async function holdSeats(
+    userId: string,
+    input: HoldInput,
+    onRejectedEarly: () => void,
+  ): Promise<repo.BookingView> {
+    let booking: { id: string; expiresAt: Date; expiredIds: string[] };
+    if (strategy.preLock) {
+      const lock = await strategy.preLock({ showId: input.showId, showSeatIds: input.seatIds });
+      if (!lock.ok) {
+        onRejectedEarly();
+        throw seatsUnavailable(
+          input.seatIds,
+          input.seatIds.filter((id) => !lock.takenSeatIds.includes(id)),
+        );
+      }
+      try {
+        booking = await holdInDatabase(userId, input);
+      } finally {
+        await lock.release();
+      }
+    } else {
+      booking = await holdInDatabase(userId, input);
+    }
+    // Only after the commit: a job or an event for a hold that rolled back would be noise.
+    await Promise.all([
+      expiry?.schedule(booking.id, booking.expiresAt),
+      seatEvents.publishBookings([booking.id, ...booking.expiredIds]),
+    ]);
+    return (await repo.findBookingView(pool, booking.id, userId))!;
+  }
+
   return {
     strategy: strategy.name,
 
@@ -103,29 +138,17 @@ export function createBookingService(
      * (seat taken, second pending booking) leaves no trace.
      */
     async hold(userId: string, input: HoldInput): Promise<repo.BookingView> {
-      let booking: { id: string; expiresAt: Date; expiredIds: string[] };
-      if (strategy.preLock) {
-        const lock = await strategy.preLock({ showId: input.showId, showSeatIds: input.seatIds });
-        if (!lock.ok) {
-          throw seatsUnavailable(
-            input.seatIds,
-            input.seatIds.filter((id) => !lock.takenSeatIds.includes(id)),
-          );
-        }
-        try {
-          booking = await holdInDatabase(userId, input);
-        } finally {
-          await lock.release();
-        }
-      } else {
-        booking = await holdInDatabase(userId, input);
+      let rejectedEarly = false;
+      try {
+        const view = await holdSeats(userId, input, () => {
+          rejectedEarly = true;
+        });
+        onHoldOutcome('held');
+        return view;
+      } catch (err) {
+        onHoldOutcome(rejectedEarly ? 'rejected_early' : holdOutcomeOf(err));
+        throw err;
       }
-      // Only after the commit: a job or an event for a hold that rolled back would be noise.
-      await Promise.all([
-        expiry?.schedule(booking.id, booking.expiresAt),
-        seatEvents.publishBookings([booking.id, ...booking.expiredIds]),
-      ]);
-      return (await repo.findBookingView(pool, booking.id, userId))!;
     },
 
     /** The user's latest bookings, newest first. */
@@ -156,6 +179,14 @@ export function createBookingService(
       return (await repo.findBookingView(pool, bookingId, userId))!;
     },
   };
+}
+
+function holdOutcomeOf(err: unknown): HoldOutcome {
+  if (err instanceof AppError) {
+    if (err.code === 'SEATS_UNAVAILABLE') return 'seats_taken';
+    if (err.status < 500) return 'refused';
+  }
+  return 'error';
 }
 
 function seatsUnavailable(requested: string[], taken: string[]): AppError {

@@ -2,7 +2,7 @@
   "name": "@bmt/platform",
   "version": "0.0.0",
   "private": true,
-  "description": "Server-side building blocks shared by the API and worker: env parsing, logger, Postgres, Redis, migrations, process lifecycle",
+  "description": "Server-side building blocks shared by the API and worker: env parsing, logger, Postgres, Redis, migrations, process lifecycle, metrics",
   "type": "module",
   "exports": {
     ".": {
@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@prometheus-io/client": "^0.16.1",
     "ioredis": "^5.4.1",
     "pg": "^8.16.0",
     "pino": "^10.0.0",
