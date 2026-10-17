@@ -132,3 +132,9 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
 - **Rate limiting:** three API instances with separate Redis connections let exactly 10 of one
   user's 30 holds through, not 30; 50 simultaneous checks against a budget of 10 allow exactly 10
   ([ADR 0010](docs/adr/0010-rate-limiting.md)).
+- **Under load, behind nginx:** 200 buyers fired at 10 seats through 3 replicas left each seat
+  with exactly one owner, and 79% of the losers were turned away by the Redis pre-lock before
+  reaching Postgres. 300 people watching one seat map heard all 3,000 seat changes, p95 108 ms.
+  One address got exactly 5 sign-in attempts a minute across 3 replicas. A second and third
+  replica cut browse p99 from 497 ms to 44 ms, but raised peak throughput only 32% on one 8-core
+  laptop ([load tests](docs/benchmarks/m7-load.md), [ADR 0016](docs/adr/0016-load-testing.md)).

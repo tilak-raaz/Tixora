@@ -66,6 +66,13 @@ process started; a restarted replica starts again from zero. To see one replica'
 docker exec bmt-api-1 node -e "fetch('http://127.0.0.1:4000/metrics').then(r => r.text()).then(console.log)"
 ```
 
+## Load tests
+
+With the stack running and seeded, `make load-browse`, `make load-storm`, `make load-fanout` and
+`make load-ratelimit` run the scenarios in [ADR 0016](../adr/0016-load-testing.md); results and how
+to read them are in [docs/benchmarks/m7-load.md](../benchmarks/m7-load.md). `make stack-scale N=1`
+(with the same `DEMO=` you started with) changes the number of API replicas; `N=3` puts it back.
+
 ## Browser tests through nginx
 
 ```bash
