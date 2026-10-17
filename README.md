@@ -4,9 +4,10 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M7 done (three replicas behind nginx, measured under load and failure, v0.8.0); M8 next (deployment).** Only what is listed under "What works today" is built. Everything
-> else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
-> behind it.
+> **Status: v1.0.0, all eight milestones done. Live at
+> [tixora.tilakraaz.cloud](https://tixora.tilakraaz.cloud)** (payments in Razorpay test mode: pay
+> with a test card or UPI, no real money moves). Only what is listed under "What works today" is
+> built, and each item has a test or a benchmark behind it.
 
 ## What works today
 
@@ -45,6 +46,11 @@ async processing and distributed rate limiting.
 - Load tests (`make load-*`, k6) and failure drills (`make drill-*`) against that stack, each of
   which fails if a rule breaks: one owner per seat, one rate limit across replicas, every live
   update delivered, no seat map left wrong after a replica, Redis or Postgres goes down
+- Deployed on one AWS EC2 instance: the same containers behind nginx with a Let's Encrypt
+  certificate, real email through Resend. Pushing a version tag builds the images in CI, deploys
+  them over SSH with a key that can do nothing but deploy a release, and checks the live site
+  ([runbook](docs/runbooks/deploy-aws.md), [ADR 0018](docs/adr/0018-deploy-single-ec2-compose.md),
+  [ADR 0019](docs/adr/0019-release-pipeline-ssh-deploy.md))
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, integration tests against real Postgres and Redis containers, and Playwright browser
@@ -150,3 +156,7 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
   seat map matched the database. The first run found four bugs the tests had missed, including a
   worker that a database restart silently killed
   ([drills](docs/benchmarks/m7-drills.md), [ADR 0017](docs/adr/0017-failure-drills.md)).
+- **Deployed:** the first release candidate built, deployed and passed its live-site check on the
+  first run. On a `t3.small` the whole stack (3 API replicas, 2 workers, the web server, Postgres,
+  Redis, nginx) uses 1.2 of its 1.9 GB, with 2 GB of swap untouched
+  ([runbook](docs/runbooks/deploy-aws.md)).

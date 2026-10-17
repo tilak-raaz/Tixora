@@ -210,15 +210,26 @@ git tag -a v1.0.0-rc.1 -m "v1.0.0-rc.1"
 git push origin v1.0.0-rc.1
 ```
 
-Watch **Actions → Release**. The first run is expected to go half way:
+Watch **Actions → Release**: **Image (server)**, **Image (web)**, then **Deploy**, which runs
+`tixora.sh deploy v1.0.0-rc.1` on the server (the first start takes a few minutes: images,
+migrations, the seeder loading the catalogue) and checks the live site.
 
-1. **Image (server)** and **Image (web)** pass: the images are in GHCR.
-2. **Deploy** fails pulling them (`denied`): GHCR packages start private, and the server pulls
-   without a token. On GitHub, **your profile → Packages → `tixora-server` → Package settings →
-   Change visibility → Public**, and the same for `tixora-web`. This is needed once.
-3. **Re-run failed jobs.** Deploy now runs `tixora.sh deploy v1.0.0-rc.1` on the server (the first
-   start takes a few minutes: images, migrations, the seeder loading the catalogue) and checks the
-   live site.
+The server pulls the images without a token, so the GHCR packages must be public. Packages pushed
+from a public repository's workflow with the source label (which the workflow sets) are linked to
+the repository and come out public. Check once: **your profile → Packages → `tixora-server` →
+Package settings** says "This package is currently public", and the same for `tixora-web`. If one
+is private, Deploy fails with `denied`: **Change visibility → Public**, then **Re-run failed
+jobs**.
+
+On this first run the server still runs the `tixora.sh` it was cloned with (see "Day to day"), so
+deploy the same tag once more by hand to let the current script finish its work (it records the
+running release in `.env`); nothing is recreated:
+
+```bash
+cd /opt/tixora/infra/deploy
+./tixora.sh deploy v1.0.0-rc.1
+grep '^TAG=' .env
+```
 
 **Server:** create the admin account (email and password are asked for, not typed on the command
 line):
@@ -246,6 +257,11 @@ All good: tag the same commit `v1.0.0` (the release PR does this).
 **Release:** merge to main, then **Mac** `git tag -a vX.Y.Z -m "vX.Y.Z"` and
 `git push origin vX.Y.Z`. Actions builds, deploys and checks. A deploy restarts containers, so
 requests and seat streams in flight at that moment are dropped and clients reconnect.
+
+**Changes to `tixora.sh` itself** take effect from the deploy after the one that brings them: a
+deploy runs the copy that was on the server before it checked out the new tag (the script reads
+itself in full first, so the checkout cannot change it halfway). Deploying the same tag again
+applies them.
 
 **Roll back** (**server**): `./tixora.sh deploy <older tag>`; every release's images stay in GHCR.
 Migrations are not undone, so a migration must keep working with the previous release's code.
