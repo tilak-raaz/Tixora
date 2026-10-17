@@ -168,14 +168,14 @@ See [ADR 0007](adr/0007-payment-confirmation.md) and [ADR 0008](adr/0008-transac
 
 ## Status by milestone
 
-| Area                          | Milestone | State       |
-| ----------------------------- | --------- | ----------- |
-| Foundations                   | M0        | Done        |
-| Accounts and catalog          | M1        | Done        |
-| Seat holds                    | M2        | Done        |
-| Payments                      | M3        | Done        |
-| Outbox and queues             | M4        | Done        |
-| Rate limiting and caching     | M5        | Done        |
-| Frontend                      | M6        | Done        |
-| Replicas, load, failure tests | M7        | In progress |
-| Deployment                    | M8        | Planned     |
+| Area                          | Milestone | State   |
+| ----------------------------- | --------- | ------- |
+| Foundations                   | M0        | Done    |
+| Accounts and catalog          | M1        | Done    |
+| Seat holds                    | M2        | Done    |
+| Payments                      | M3        | Done    |
+| Outbox and queues             | M4        | Done    |
+| Rate limiting and caching     | M5        | Done    |
+| Frontend                      | M6        | Done    |
+| Replicas, load, failure tests | M7        | Done    |
+| Deployment                    | M8        | Planned |
