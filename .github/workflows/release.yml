@@ -1,0 +1,101 @@
+name: Release
+
+# On a release tag: build the server and web images, push them to GHCR, then deploy them to the
+# server and check the live site (ADRs 0018, 0019). A tag is only pushed for a commit on main, which
+# CI has already tested.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# Two releases never deploy at once; a second tag waits for the first to finish.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  SITE_URL: https://tixora.tilakraaz.cloud
+
+jobs:
+  images:
+    name: Image (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: server
+            dockerfile: infra/docker/server.Dockerfile
+          - image: web
+            dockerfile: infra/docker/web.Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The source label links the package to this repository on GitHub.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/tilak-raaz/tixora-${{ matrix.image }}:${{ github.ref_name }}
+            ghcr.io/tilak-raaz/tixora-${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    name: Deploy
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://tixora.tilakraaz.cloud
+    steps:
+      # The key can do one thing on the server: deploy a release tag (authorized_keys forces
+      # `tixora.sh ci-deploy`). The host key is pinned, so the job refuses an unknown server.
+      - name: Set up the deploy key
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy ${{ github.ref_name }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: >-
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
+          "$DEPLOY_USER@$DEPLOY_HOST" "$GITHUB_REF_NAME"
+
+      # Through the real path: DNS, TLS, nginx, the web server and an API replica.
+      - name: Check the live site
+        run: |
+          curl -fsS --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null -w 'web %{http_code}\n' "$SITE_URL/"
+          curl -fsS --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null -w 'api %{http_code}\n' "$SITE_URL/api/v1/cities"
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${SITE_URL/https:/http:}/")
+          echo "http redirect $code"
+          test "$code" = 301

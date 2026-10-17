@@ -12,6 +12,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `infra/deploy/tixora.sh` on the server: `tls-init` for the first certificate, `deploy <tag>` to check out a release, pull its images and start it, plus `seed`, `ps`, `logs` and `down`
 - `infra/deploy/.env.example`: every production setting; the real `.env` stays on the server
 - `make deploy-check` and a CI step: the production compose file resolves, and nginx accepts the HTTPS config
+- Release pipeline (ADR 0019): pushing a `v*` tag builds the server and web images for amd64, pushes them to GHCR, deploys them over SSH and checks the live site over HTTPS (web page, an API route, the HTTP redirect)
+- `tixora.sh ci-deploy`: what the CI deploy key is forced to run; it deploys only an exact release tag and refuses anything else
+- `make deploy-check` also checks the server helper parses
 
 ### Changed
 
