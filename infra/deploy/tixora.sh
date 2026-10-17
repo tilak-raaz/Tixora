@@ -5,6 +5,7 @@
 #   ./tixora.sh tls-init         first time only: get the HTTPS certificate (nginx must be stopped)
 #   ./tixora.sh deploy <tag>     check out the release, pull its images, start or update the stack
 #   ./tixora.sh seed             add the coming week's shows now (the seeder does it daily anyway)
+#   ./tixora.sh admin            create (or promote) the admin account; asks for email and password
 #   ./tixora.sh ps | logs [svc] | down
 #   ./tixora.sh ci-deploy        only for the CI deploy key (forced in authorized_keys); the tag
 #                                CI sends arrives in SSH_ORIGINAL_COMMAND
@@ -19,10 +20,17 @@ main() {
 
   deploy() {
     local tag=$1
+    [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || {
+      echo "refusing: '$tag' is not a release tag"
+      exit 2
+    }
     git fetch --tags --quiet origin
     git -c advice.detachedHead=false checkout --quiet "$tag"
     TAG="$tag" docker compose pull --quiet
     TAG="$tag" docker compose up -d --wait --wait-timeout 300 --remove-orphans
+    # Record the running release, so later commands (seed, admin, a manual `docker compose up`)
+    # use its images rather than :latest.
+    if grep -q '^TAG=' .env; then sed -i "s/^TAG=.*/TAG=$tag/" .env; else echo "TAG=$tag" >>.env; fi
     docker image prune -f >/dev/null
     echo "$tag is live"
   }
@@ -43,22 +51,27 @@ main() {
       deploy "${2:?usage: ./tixora.sh deploy <tag>, e.g. v1.0.0}"
       ;;
     ci-deploy)
-      # Whatever the CI key asked to run is only accepted if it is exactly a release tag.
-      local tag=${SSH_ORIGINAL_COMMAND:-}
-      [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || {
-        echo "refusing: '$tag' is not a release tag"
-        exit 2
-      }
-      deploy "$tag"
+      # Whatever the CI key asked to run arrives here; deploy accepts it only if it is exactly a
+      # release tag.
+      deploy "${SSH_ORIGINAL_COMMAND:-}"
       ;;
     seed)
       docker compose run --rm --no-deps migrate node --import tsx apps/api/src/scripts/seed.ts
+      ;;
+    admin)
+      # Asked for at a prompt, so the password stays out of shell history and the process list.
+      local email password
+      read -rp 'admin email: ' email
+      read -rsp 'admin password (8+ characters): ' password
+      echo
+      ADMIN_EMAIL=$email ADMIN_PASSWORD=$password docker compose run --rm --no-deps \
+        -e ADMIN_EMAIL -e ADMIN_PASSWORD migrate node --import tsx apps/api/src/scripts/create-admin.ts
       ;;
     ps) docker compose ps ;;
     logs) shift; docker compose logs -f --tail 100 "$@" ;;
     down) docker compose down ;;
     *)
-      echo 'usage: ./tixora.sh tls-init | deploy <tag> | seed | ps | logs [service] | down'
+      echo 'usage: ./tixora.sh tls-init | deploy <tag> | seed | admin | ps | logs [service] | down'
       exit 2
       ;;
   esac
