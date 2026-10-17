@@ -1,0 +1,53 @@
+# Production nginx (ADR 0018): the same routes as the local stack (../nginx), behind HTTPS.
+# ${DOMAIN} is filled in from the server's .env when the container starts; nothing else is
+# substituted, so nginx's own $variables stay as they are.
+
+worker_processes auto;
+error_log /dev/stderr warn;
+
+events {
+  worker_connections 4096;
+}
+
+http {
+  include /etc/nginx/bmt/http.conf;
+
+  # Port 80: Let's Encrypt's renewal challenges, the health check, and a redirect to HTTPS.
+  server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+      root /var/www/certbot;
+    }
+
+    location = /nginx/health {
+      access_log off;
+      default_type text/plain;
+      return 200 "ok\n";
+    }
+
+    location / {
+      return 301 https://$host$request_uri;
+    }
+  }
+
+  server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_timeout 1d;
+
+    # Browsers use HTTPS for this host from now on, even if a link says http://.
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    include /etc/nginx/bmt/routes.conf;
+  }
+
+  include /etc/nginx/bmt/internal.conf;
+}

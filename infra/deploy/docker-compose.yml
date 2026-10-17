@@ -1,0 +1,213 @@
+# The production stack (ADR 0018), on one server: nginx with HTTPS in front of the API replicas,
+# workers, the web server, Postgres and Redis. Images come from GitHub's container registry, built
+# by CI for each release tag; nothing is built on the server. Settings and secrets come from .env
+# next to this file (start from .env.example), which never leaves the server.
+#
+# Run it through ./tixora.sh (deploy, seed, logs, ...); see docs/runbooks/deploy-aws.md.
+name: tixora
+
+x-logging: &logging # A small disk: keep each container's logs to 30 MB.
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-server: &server
+  image: ghcr.io/tilak-raaz/tixora-server:${TAG:-latest}
+  init: true
+  logging: *logging
+
+x-server-env: &server-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DATABASE_URL: postgres://bmt:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/bmt
+  REDIS_URL: redis://redis:6379
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+  BETTER_AUTH_URL: https://${DOMAIN:?set DOMAIN in .env}
+  WEB_ORIGINS: https://${DOMAIN}
+  RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+  RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+  RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+
+x-node-health: &node-health
+  interval: 10s
+  timeout: 3s
+  retries: 12
+  start_period: 20s
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: bmt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: bmt
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bmt -d bmt']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *logging
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Applies pending migrations once; nothing else starts until it has succeeded.
+  migrate:
+    <<: *server
+    command: ['node', '--import', 'tsx', 'apps/api/src/db/migrate-cli.ts']
+    environment:
+      <<: *server-env
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *server
+    command: ['node', '--import', 'tsx', 'apps/api/src/server.ts']
+    restart: unless-stopped
+    environment:
+      <<: *server-env
+      PORT: 4000
+    deploy:
+      replicas: ${API_REPLICAS:-3}
+    stop_grace_period: 15s
+    healthcheck:
+      <<: *node-health
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *server
+    command: ['node', '--import', 'tsx', 'apps/worker/src/main.ts']
+    restart: unless-stopped
+    environment:
+      <<: *server-env
+      MAILER: resend
+      RESEND_API_KEY: ${RESEND_API_KEY:?set RESEND_API_KEY in .env}
+      EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM in .env}
+      METRICS_PORT: 9100
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
+    stop_grace_period: 15s
+    healthcheck:
+      <<: *node-health
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:9100/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # The demo catalog: seeds it on the first run, then adds the coming week's shows once a day.
+  seeder:
+    <<: *server
+    command:
+      ['sh', '-c', 'while :; do node --import tsx apps/api/src/scripts/seed.ts; sleep 86400; done']
+    restart: unless-stopped
+    environment:
+      <<: *server-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: ghcr.io/tilak-raaz/tixora-web:${TAG:-latest}
+    init: true
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      API_URL: http://nginx:8081
+    healthcheck:
+      <<: *node-health
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN}
+    # Fill in the domain, start nginx, and reload it every 12 h so a renewed certificate is used.
+    command:
+      [
+        '/bin/sh',
+        '-c',
+        "envsubst '$${DOMAIN}' < /etc/nginx/bmt-prod/nginx.conf.template > /etc/nginx/nginx.conf || exit 1; (while :; do sleep 43200; nginx -s reload; done) & exec nginx -g 'daemon off;'",
+      ]
+    volumes:
+      - ../nginx:/etc/nginx/bmt:ro
+      - ./nginx.conf.template:/etc/nginx/bmt-prod/nginx.conf.template:ro
+      - certbot_etc:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/nginx/health']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  # Renews the certificate when it is close to expiry (twice a day it checks); nginx picks it up
+  # at its next reload. The first certificate is issued by `./tixora.sh tls-init`.
+  certbot:
+    image: certbot/certbot:v2.11.0
+    restart: unless-stopped
+    logging: *logging
+    entrypoint:
+      [
+        '/bin/sh',
+        '-c',
+        'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200 & wait $${!}; done',
+      ]
+    volumes:
+      - certbot_etc:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
+volumes:
+  pg_data:
+  redis_data:
+  certbot_etc:
+  certbot_www:

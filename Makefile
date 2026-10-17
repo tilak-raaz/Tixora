@@ -5,7 +5,7 @@ STACK = $(COMPOSE) $(if $(DEMO),-f infra/docker-compose.demo.yml,) --profile ful
 LOAD = $(COMPOSE) --profile load run --rm --no-deps
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-scale stack-warm stack-metrics stack-e2e load-browse load-storm load-fanout load-ratelimit drill-replica drill-redis drill-postgres drill-worker test test-unit test-integration e2e lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-scale stack-warm stack-metrics stack-e2e load-browse load-storm load-fanout load-ratelimit drill-replica drill-redis drill-postgres drill-worker deploy-check test test-unit test-integration e2e lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -37,7 +37,7 @@ migrate: ## Apply pending database migrations
 create-admin: ## Create or promote the admin account from ADMIN_* in .env
 	npm run create-admin
 
-seed: ## Load a demo city, theatres, movies and a week of shows (runs once)
+seed: ## Load a demo city, theatres, movies and a week of shows; later runs add the coming week's shows
 	npm run seed
 
 bench: ## Benchmark the seat-hold strategies; writes docs/benchmarks/ (needs make up)
@@ -120,6 +120,9 @@ drill-postgres: ## Drill: restart Postgres under traffic
 drill-worker: ## Drill: kill a worker while confirmation emails go out (needs make stack DEMO=1)
 	$(MAKE) stack-warm
 	infra/drills/run.sh worker
+
+deploy-check: ## Check the production compose file and HTTPS nginx config (infra/deploy, ADR 0018)
+	infra/deploy/check.sh
 
 test: ## Run all tests (integration tests start their own containers)
 	npm test

@@ -193,6 +193,8 @@ services:
       - '8080:8080'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # http.conf, routes.conf and internal.conf, shared with production (infra/deploy).
+      - ./nginx:/etc/nginx/bmt:ro
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/nginx/health']
       interval: 5s

@@ -38,6 +38,9 @@ jobs:
       - name: Build web
         run: npm run build:web
 
+      - name: Production config (compose file, HTTPS nginx)
+        run: make deploy-check
+
       - name: Unit tests
         run: npm run test:unit
 

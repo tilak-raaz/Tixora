@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Production stack (ADR 0018): `infra/deploy/docker-compose.yml` runs the CI-built images from GHCR on one server, with Postgres and Redis in containers, `API_REPLICAS` and `WORKER_REPLICAS` settings, Resend for email and Razorpay in test mode. Container logs are capped
+- HTTPS: nginx serves only ports 80 (ACME challenge, redirect) and 443 (TLS 1.2/1.3, HTTP/2, HSTS) with a Let's Encrypt certificate; a certbot container renews it and nginx reloads twice a day
+- `infra/deploy/tixora.sh` on the server: `tls-init` for the first certificate, `deploy <tag>` to check out a release, pull its images and start it, plus `seed`, `ps`, `logs` and `down`
+- `infra/deploy/.env.example`: every production setting; the real `.env` stays on the server
+- `make deploy-check` and a CI step: the production compose file resolves, and nginx accepts the HTTPS config
+
+### Changed
+
+- `make seed` tops up: on an existing database it adds the coming week's shows instead of stopping, so the deployed stack runs it daily and never runs out of shows
+- nginx config split into shared pieces (`infra/nginx/http.conf`, `routes.conf`, `internal.conf`) used by both the local stack and production
+
 ## [0.8.0] - 2026-10-17
 
 M7: the app as a production-like stack of containers behind nginx, measured under load and broken on purpose.
