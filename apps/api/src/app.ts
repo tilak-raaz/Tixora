@@ -76,6 +76,12 @@ export function createApp(deps: AppDeps): Express {
   app.set('trust proxy', 1);
 
   app.use(requestLogger(deps.logger));
+  // server.ts sets this when shutdown starts. Every response then closes its connection, so nginx
+  // stops reusing kept-alive connections to this replica and sends new requests to the others.
+  app.use((_req, res, next) => {
+    if (app.locals.draining) res.set('Connection', 'close');
+    next();
+  });
   if (deps.metrics) app.use(deps.metrics.http);
 
   const limits = deps.rateLimits

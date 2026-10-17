@@ -35,6 +35,13 @@ export function liveRouter(deps: {
     if (!hub) {
       throw new AppError(503, 'SERVICE_UNAVAILABLE', 'Live seat updates are not available');
     }
+    // This replica is shutting down. A 503 before the stream starts lets nginx try another replica
+    // straight away (proxy_next_upstream http_503 on this route), instead of the browser reconnecting
+    // here again and again until the process exits.
+    if (hub.closing) {
+      res.set('Retry-After', '1');
+      throw new AppError(503, 'SERVICE_UNAVAILABLE', 'This server is restarting; try again');
+    }
     const { id: showId } = parseParams(idParam, req);
     const { rowCount } = await deps.pool.query('SELECT 1 FROM shows WHERE id = $1', [showId]);
     if (rowCount === 0) throw new NotFoundError('Show not found');

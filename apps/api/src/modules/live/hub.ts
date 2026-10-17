@@ -30,6 +30,8 @@ export interface SeatEventHub {
   /** Starts sending a show's events to `stream` once subscribed. Returns the function that stops. */
   watch(showId: string, stream: SeatStream): Promise<() => void>;
   stats(): { shows: number; streams: number };
+  /** True once close() has started: new viewers should be sent to another replica. */
+  readonly closing: boolean;
   /** Ends every stream (browsers reconnect elsewhere) and closes the subscription. */
   close(): Promise<void>;
 }
@@ -52,6 +54,7 @@ export function createSeatEventHub(
 
   const viewers = new Map<string, Set<SeatStream>>();
   const subscriptions = new Map<string, Promise<unknown>>();
+  let closing = false;
 
   function broadcast(showId: string, event: Parameters<SeatStream['send']>[0], data: string) {
     for (const stream of viewers.get(showId) ?? []) {
@@ -140,6 +143,10 @@ export function createSeatEventHub(
       return () => stopWatching(showId, stream);
     },
 
+    get closing() {
+      return closing;
+    },
+
     stats() {
       let streams = 0;
       for (const set of viewers.values()) streams += set.size;
@@ -147,6 +154,7 @@ export function createSeatEventHub(
     },
 
     async close() {
+      closing = true;
       clearInterval(timer);
       for (const streams of viewers.values()) {
         for (const stream of streams) stream.end();
