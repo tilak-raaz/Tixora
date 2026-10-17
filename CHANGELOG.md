@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-18
+
+A fuller, friendlier home page: the introduction as an admit-one ticket, an account drawer, and ten movies across three theatres.
+
 ### Added
 
 - Home page introduction drawn as an admit-one ticket: what the site does on the red body, and a torn-off stub with a small seat map showing two seats held for you (one seat flashes "taken" on load, unless reduced motion is set)
@@ -228,7 +232,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/tilak-raaz/Tixora/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/tilak-raaz/Tixora/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/tilak-raaz/Tixora/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/tilak-raaz/Tixora/compare/v0.6.0...v0.7.0

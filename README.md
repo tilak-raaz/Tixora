@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: v1.0.0, all eight milestones done. Live at
+> **Status: v1.1.0, all nine milestones (M0 to M8) done. Live at
 > [tixora.tilakraaz.cloud](https://tixora.tilakraaz.cloud)** (payments in Razorpay test mode: pay
 > with a test card or UPI, no real money moves). Only what is listed under "What works today" is
 > built, and each item has a test or a benchmark behind it.
