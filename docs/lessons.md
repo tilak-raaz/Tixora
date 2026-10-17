@@ -3,6 +3,21 @@
 Bugs found, surprises, and what each one taught. Newest first. These become the stories for
 interviews, so record the symptom, the cause, the fix, and how a test now guards it.
 
+## 2026-10-17 · Three replicas are not three times faster
+
+- **Symptom:** the capacity run served 1,206 requests a second on one API replica and 1,586 on
+  three: 32% more, not 200% more. At normal browsing load the median hardly changed either.
+- **Cause:** the replicas were the bottleneck only while there was one of them. That replica sat
+  at one full core, the limit of Node's single JavaScript thread. With three, each was busy about
+  70% of the time, and the ceiling moved to what shares the same 8 CPUs: the load generator, nginx
+  and Postgres. What three replicas did change was the tail: at the same browsing load, p99 fell
+  from 497 ms to 44 ms, because a burst no longer queues behind one busy thread.
+- **Fix:** none needed; the measurement corrected the expectation. Scaling out pays only while the
+  thing being scaled is the bottleneck, and the per-replica metrics (CPU, event loop lag) show
+  when it stops being one.
+- **Guarded by:** `make load-browse THINK=0` with `make stack-scale N=1` and `N=3`, and the
+  numbers in docs/benchmarks/m7-load.md.
+
 ## 2026-10-17 · Healthy is not the same as ready to be timed
 
 - **Symptom:** the first Playwright test through nginx failed right after `make stack-e2e`

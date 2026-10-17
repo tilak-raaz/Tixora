@@ -52,5 +52,13 @@ export default tseslint.config(
       '@next/next/no-html-link-for-pages': 'off',
     },
   },
+  // k6 load scenarios: k6's own globals, and console is how k6 scripts report.
+  {
+    files: ['infra/load/**/*.js'],
+    languageOptions: {
+      globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly' },
+    },
+    rules: { 'no-console': 'off' },
+  },
   prettier,
 );

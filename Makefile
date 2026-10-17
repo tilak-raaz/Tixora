@@ -1,9 +1,11 @@
 COMPOSE = docker compose -f infra/docker-compose.yml
 # The full stack (ADR 0014): the app in containers behind nginx. DEMO=1 adds fake payments.
 STACK = $(COMPOSE) $(if $(DEMO),-f infra/docker-compose.demo.yml,) --profile full
+# Load generators for the full stack (ADR 0016); they run next to it, on its network.
+LOAD = $(COMPOSE) --profile load run --rm --no-deps
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-warm stack-metrics stack-e2e test test-unit test-integration e2e lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-scale stack-warm stack-metrics stack-e2e load-browse load-storm load-fanout load-ratelimit test test-unit test-integration e2e lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -72,6 +74,10 @@ stack-logs: ## Follow the stack's logs (nginx's show which replica answered each
 stack-ps: ## Show the stack's containers and their health
 	$(STACK) ps
 
+stack-scale: ## Run N API replicas behind nginx: make stack-scale N=1 (same DEMO= as make stack)
+	$(STACK) up -d --no-deps --wait --scale api=$(N) api
+	$(MAKE) stack-warm
+
 stack-metrics: ## Each API replica's and worker's metrics side by side (ROUTES=1: busiest routes too)
 	node infra/scripts/metrics.mjs $(if $(ROUTES),--routes,)
 
@@ -83,6 +89,21 @@ stack-e2e: ## Playwright through nginx: starts the stack with fake payments and 
 	$(MAKE) stack-seed DEMO=1
 	$(MAKE) stack-warm
 	E2E_BASE_URL=http://localhost:8080 npm run e2e
+
+load-browse: ## Load: visitors browsing up to VUS (100) at once; THINK=0 for a capacity run
+	$(MAKE) stack-warm
+	$(LOAD) k6 run -e VUS=$(or $(VUS),100) $(if $(THINK),-e THINK=$(THINK),) /load/browse.js
+
+load-storm: ## Load: BUYERS (200) grab SEATS (10) seats at once; exactly SEATS may win
+	$(MAKE) stack-warm
+	$(LOAD) k6 run -e BUYERS=$(or $(BUYERS),200) -e SEATS=$(or $(SEATS),10) /load/seat-storm.js
+
+load-fanout: ## Load: VIEWERS (300) watch one seat map; time for each hold to reach all of them
+	$(MAKE) stack-warm
+	$(LOAD) -e VIEWERS=$(or $(VIEWERS),300) -e CHANGES=$(or $(CHANGES),10) fanout
+
+load-ratelimit: ## Load: one address hammers sign-in across all replicas; exactly 5 may pass a minute
+	$(LOAD) k6 run /load/rate-limit.js
 
 test: ## Run all tests (integration tests start their own containers)
 	npm test

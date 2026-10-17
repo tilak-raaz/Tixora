@@ -3,6 +3,7 @@
 # - Profile `full` (`make stack`): the app in containers too, production-like, behind nginx at
 #   http://localhost:8080: 3 API replicas, 2 workers, the web server, and migrations run once
 #   before any of them start (ADR 0014). It uses the same Postgres and Redis as `make up`.
+# - Profile `load` (`make load-*`): k6 and a Node script that load the full stack (ADR 0016).
 name: bmt
 
 # Settings shared by the API, the worker and the migrate job. The secret has a local-only default;
@@ -193,6 +194,27 @@ services:
         condition: service_healthy
       web:
         condition: service_healthy
+
+  # --- Profile `load` (make load-*, ADR 0016) -------------------------------------------------
+  # Load generators on the stack's network. They call nginx's internal port, where each simulated
+  # visitor can bring its own X-Forwarded-For address (see infra/load/lib.js).
+
+  k6:
+    profiles: [load]
+    image: grafana/k6:1.0.0
+    volumes:
+      - ./load:/load:ro
+    environment:
+      BASE_URL: http://nginx:8081
+
+  fanout:
+    profiles: [load]
+    image: node:24-bookworm-slim
+    command: ['node', '/load/fanout.mjs']
+    volumes:
+      - ./load:/load:ro
+    environment:
+      BASE_URL: http://nginx:8081
 
 volumes:
   pg_data:

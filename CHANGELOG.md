@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
+- Load tests (ADR 0016), run with k6 in a container on the stack's network: `make load-browse` (visitors browsing, ramping to `VUS`), `make load-storm` (`BUYERS` grab `SEATS` seats at once; exactly `SEATS` may win), `make load-fanout` (`VIEWERS` watch one seat map; time for each hold to reach all of them; a Node.js script, as k6 has no SSE client) and `make load-ratelimit` (one address hammers sign-in across all replicas; exactly 5 may pass). Each simulated visitor has its own address, so per-IP limits stay on; each scenario fails if its rule breaks
+- `make stack-scale N=1`: run a different number of API replicas behind nginx
+
+### Added
+
 - Metrics (ADR 0015): every API replica serves `GET /metrics` and every worker serves it on `METRICS_PORT` (9100, also its health check), in the Prometheus text format with `service` and `instance` labels. Request latency by route pattern and status, hold outcomes (held, rejected early by the Redis pre-lock, seat taken in Postgres, refused, error), open seat streams, the Postgres pool, jobs per queue, queue depth and outbox lag, and Node's own (CPU, memory, event loop lag). nginx does not route them
 - `make stack-metrics` (`ROUTES=1` for the busiest routes): every replica's and worker's numbers side by side, read from inside the containers
 
