@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { Container } from '@/components/container';
 import { DateStrip } from '@/components/date-strip';
 import { EmptyState } from '@/components/empty-state';
+import { HeroTicket } from '@/components/hero-ticket';
 import { MovieCard } from '@/components/movie-card';
 import { getCities, getMoviesInCity } from '@/lib/catalog';
 import { CITY_COOKIE_NAME, pickCity } from '@/lib/city';
@@ -9,6 +10,9 @@ import { dateHeadline, firstParam, isIsoDate, nextDays, todayIn } from '@/lib/fo
 
 /** How many days ahead the date strip offers. The seed data covers a week. */
 const DAYS_AHEAD = 7;
+
+/** The listing's id: the hero's button scrolls to it. */
+const LISTING_ID = 'showing';
 
 export default async function HomePage({
   searchParams,
@@ -41,14 +45,19 @@ export default async function HomePage({
   const query = (d: string) => `city=${encodeURIComponent(city.slug)}&date=${d}`;
 
   return (
-    <Container className="flex flex-col gap-6 pt-8 sm:pt-12">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <Container className="flex flex-col gap-6 pt-6 sm:pt-10">
+      <HeroTicket cityName={city.name} listingId={LISTING_ID} />
+
+      <div
+        id={LISTING_ID}
+        className="mt-4 flex scroll-mt-20 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"
+      >
         <div>
-          <h1 className="font-display text-5xl leading-[0.9] uppercase sm:text-7xl">
+          <h2 className="font-display text-4xl leading-[0.9] uppercase sm:text-6xl">
             {dateHeadline(date, today)}
             <br />
             in {city.name}
-          </h1>
+          </h2>
           <p className="mt-3 text-muted">
             {movies.length === 1 ? '1 movie showing.' : `${movies.length} movies showing.`} Pick one
             to see times and seats.

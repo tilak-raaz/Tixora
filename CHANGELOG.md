@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- Home page introduction drawn as an admit-one ticket: what the site does on the red body, and a torn-off stub with a small seat map showing two seats held for you (one seat flashes "taken" on load, unless reduced motion is set)
+- Account menu: a round avatar in the header opens a drawer from the right with your name and email, My bookings and Sign out
+- Demo catalogue: 10 movies and a third theatre (Panposh Talkies, 2 screens), so 20 shows a day and every movie plays daily
+
+### Changed
+
+- `make seed` creates whatever is missing by name (seat tiers, city, theatres, screens, movies) before adding the week's shows, so an existing database, including the deployed one, picks up new demo data on its next run
+
 ## [1.0.0] - 2026-10-18
 
 M8: deployed. The stack runs on one AWS EC2 instance at https://tixora.tilakraaz.cloud behind HTTPS, and pushing a version tag builds, deploys and checks it.
