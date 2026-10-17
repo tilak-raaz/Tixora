@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-18
+
+M8: deployed. The stack runs on one AWS EC2 instance at https://tixora.tilakraaz.cloud behind HTTPS, and pushing a version tag builds, deploys and checks it.
+
 ### Added
 
 - Production stack (ADR 0018): `infra/deploy/docker-compose.yml` runs the CI-built images from GHCR on one server, with Postgres and Redis in containers, `API_REPLICAS` and `WORKER_REPLICAS` settings, Resend for email and Razorpay in test mode. Container logs are capped
@@ -23,6 +27,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - `make seed` tops up: on an existing database it adds the coming week's shows instead of stopping, so the deployed stack runs it daily and never runs out of shows
 - `tixora.sh deploy` records the running release in `.env` (so later commands use its images, not `:latest`) and, like `ci-deploy`, accepts only a release tag
 - nginx config split into shared pieces (`infra/nginx/http.conf`, `routes.conf`, `internal.conf`) used by both the local stack and production
+- Runbook: GHCR packages published from this public repository come out public, so the first deploy pulls without a manual visibility change (step 9 no longer predicts a failure); a change to `tixora.sh` takes effect from the deploy after the one that brings it
 
 ## [0.8.0] - 2026-10-17
 
@@ -213,7 +218,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/tilak-raaz/Tixora/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/tilak-raaz/Tixora/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/tilak-raaz/Tixora/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/tilak-raaz/Tixora/compare/v0.5.0...v0.6.0

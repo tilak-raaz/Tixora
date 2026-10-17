@@ -11,7 +11,9 @@
 #                                CI sends arrives in SSH_ORIGINAL_COMMAND
 #
 # The whole script is one function, read in full before it runs: `deploy` checks out a new
-# version of this very file, and bash would otherwise read the rest from the new version.
+# version of this very file, and bash would otherwise read the rest from the new version. So a
+# deploy always runs the copy from before its checkout: a change to this script takes effect from
+# the next deploy (deploying the same tag again is enough).
 main() {
   set -euo pipefail
   cd "$(dirname "$0")"
