@@ -90,6 +90,8 @@ installProcessHandlers({
   logger,
   timeoutMs: config.SHUTDOWN_TIMEOUT_MS,
   close: async () => {
+    // 0. Answer everything from here on with `Connection: close`, so nginx moves to other replicas.
+    app.locals.draining = true;
     // 1. Stop accepting connections; in-flight requests carry on.
     const drained = new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
@@ -97,6 +99,8 @@ installProcessHandlers({
     // 2. End the live seat streams: they never finish on their own, so the server would wait for
     //    them forever. Browsers reconnect by themselves, to another replica behind nginx.
     await seatEventHub.close();
+    // The streams just ended leave idle kept-alive connections behind; drop them too.
+    server.closeIdleConnections();
     await drained;
     // 3. Only then close the connections those requests were using.
     await Promise.all([pool.end(), redis.quit(), holdExpiryQueue.close()]);

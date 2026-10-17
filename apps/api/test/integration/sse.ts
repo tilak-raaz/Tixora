@@ -12,6 +12,8 @@ export interface SseConnection {
   events: SseEvent[];
   /** Resolves with the first event (already received or still to come) that matches. */
   waitFor(match: (event: SseEvent) => boolean, timeoutMs?: number): Promise<SseEvent>;
+  /** Resolves when the stream is over: the server ended it, or close() was called. */
+  ended: Promise<void>;
   close(): void;
 }
 
@@ -23,9 +25,10 @@ export async function openSse(url: string): Promise<SseConnection> {
   });
   const events: SseEvent[] = [];
   const waiters = new Set<() => void>();
+  let ended: Promise<void> = Promise.resolve();
 
   if (res.ok && res.body) {
-    void (async () => {
+    ended = (async () => {
       const decoder = new TextDecoder();
       let buffer = '';
       try {
@@ -58,6 +61,7 @@ export async function openSse(url: string): Promise<SseConnection> {
     status: res.status,
     headers: res.headers,
     events,
+    ended,
     waitFor(match, timeoutMs = 3_000) {
       return new Promise((resolve, reject) => {
         const check = () => {

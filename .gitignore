@@ -17,3 +17,4 @@ next-env.d.ts
 
 # Raw output of local load runs (the write-up lives in docs/benchmarks)
 infra/load/results/
+infra/drills/results/

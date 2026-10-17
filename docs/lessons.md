@@ -3,6 +3,37 @@
 Bugs found, surprises, and what each one taught. Newest first. These become the stories for
 interviews, so record the symptom, the cause, the fix, and how a test now guards it.
 
+## 2026-10-17 · A database restart silently killed a worker
+
+- **Symptom:** the Postgres drill looked fine from outside (19 reads failed over 2 seconds, then
+  everything recovered). The worker drill that followed then delivered 5 of 20 emails and stopped.
+- **Cause:** the restart cut a connection that a worker had checked out in the middle of a
+  transaction. `pg` emits that as an `'error'` event on the client, and only idle clients had a
+  listener (the pool's). Node turns an unheard `'error'` into an uncaught exception, so the worker
+  exited. Compose had no restart policy, the health check cannot flag a container that is gone, and
+  `make stack-metrics` simply listed one worker fewer. The next drill killed the only worker left.
+- **Fix:** an error listener on every pooled connection, not only idle ones: the work in progress
+  fails and is retried, and the process stays up. App containers now restart on failure.
+- **Guarded by:** `db-connection-loss.test.ts`, which cuts its own connection mid-transaction and
+  fails with the same uncaught exception without the fix; `make drill-postgres` then `make drill-worker`.
+
+## 2026-10-17 · The Redis-down test passed; a Redis outage still broke holds
+
+- **Symptom:** with Redis stopped for 30 seconds, holds failed with 500s and 5-second timeouts,
+  although ADR 0005 says holds work without Redis and a test said so too.
+- **Cause:** two things. Every signed-in request failed with "Failed to get session": Better Auth
+  reads the session from Redis first and threw on the error, although every session is also in
+  Postgres and it already falls back to Postgres when Redis has no copy. And the seat pre-lock had
+  no time limit. The existing test used a Redis client set to fail instantly (no offline queue, no
+  retries). The production client queues commands while Redis is away and retries them for seconds,
+  so the fallback was reached only after the request had timed out.
+- **Fix:** the session store treats a Redis error, or no answer within 250 ms, as "no copy", so the
+  session comes from Postgres. The pre-lock is skipped when Redis is not connected and capped at
+  200 ms otherwise, like the rate limiter. After the fix, 35 of 35 holds succeeded through the outage.
+- **Guarded by:** `session-redis-down.test.ts` and a hold test against a Redis that accepts connections
+  but never answers, built with the production client settings (it hangs without the fix). The
+  lesson: a failure test is only as good as its resemblance to the real failure.
+
 ## 2026-10-17 · Three replicas are not three times faster
 
 - **Symptom:** the capacity run served 1,206 requests a second on one API replica and 1,586 on

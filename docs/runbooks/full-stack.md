@@ -73,6 +73,15 @@ With the stack running and seeded, `make load-browse`, `make load-storm`, `make 
 to read them are in [docs/benchmarks/m7-load.md](../benchmarks/m7-load.md). `make stack-scale N=1`
 (with the same `DEMO=` you started with) changes the number of API replicas; `N=3` puts it back.
 
+## Failure drills
+
+`make drill-replica` (`MODE=stop` for a graceful stop), `make drill-redis`, `make drill-postgres` and
+`make drill-worker` break one part of the running stack under steady traffic and put it back
+([ADR 0017](../adr/0017-failure-drills.md), results in
+[docs/benchmarks/m7-drills.md](../benchmarks/m7-drills.md)). They restart containers and create
+users and bookings, so run them only against this local stack. The worker drill needs
+`make stack DEMO=1`. If you stop a drill halfway with Ctrl-C, it puts back what it broke.
+
 ## Browser tests through nginx
 
 ```bash

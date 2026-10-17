@@ -24,6 +24,15 @@ export function createPool(config: PoolConfig): Pool {
   // discards that client and opens a new one on demand. Crashing here would turn a
   // database blip into an outage.
   pool.on('error', (err) => config.logger.error({ err }, 'idle postgres client error'));
+  // A client that is checked out (inside a transaction, between two of its queries) gets the same
+  // error on itself, where nobody listens: Node turns an unheard 'error' into an uncaught exception
+  // and the process exits. The failure drill found this (docs/lessons.md). With a listener, the
+  // client's next query fails instead, the transaction rolls back and the caller retries.
+  pool.on('connect', (client) => {
+    client.on('error', (err) =>
+      config.logger.warn({ err }, 'postgres connection lost while in use'),
+    );
+  });
   return pool;
 }
 

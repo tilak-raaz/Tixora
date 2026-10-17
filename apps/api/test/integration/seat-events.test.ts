@@ -263,6 +263,27 @@ describe('the endpoint', () => {
     }
   });
 
+  it('sends new viewers elsewhere while the replica shuts down, and ends the open streams', async () => {
+    const stopping = await startReplica();
+    try {
+      const { showId } = await createShowFixture(stopping.deps.pool, 1);
+      const viewer = await watch(stopping, showId);
+
+      stopping.app.locals.draining = true;
+      await stopping.hub.close();
+      await viewer.ended;
+
+      // A 503 before the stream starts, so nginx can try another replica, and no kept-alive
+      // connection for it to come back on.
+      const res = await request(stopping.app).get(`/api/v1/shows/${showId}/seats/events`);
+      expect(res.status).toBe(503);
+      expect(res.headers['retry-after']).toBe('1');
+      expect(res.headers.connection).toBe('close');
+    } finally {
+      await stopReplica(stopping);
+    }
+  });
+
   it('answers 503 when live updates are not configured', async () => {
     const deps = createTestDeps();
     try {

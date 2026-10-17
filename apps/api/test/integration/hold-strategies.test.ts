@@ -1,3 +1,4 @@
+import { createServer, type AddressInfo, type Server, type Socket } from 'node:net';
 import { createLogger, createPool, createRedis, type Pool, type Redis } from '@bmt/platform';
 import { Redis as IORedis } from 'ioredis';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -101,4 +102,39 @@ describe('redis strategy', () => {
     expect(strategy.stats.redisErrors).toBe(30);
     deadRedis.disconnect();
   });
+
+  it('does not make holds wait for a Redis that has gone away, the way a live client sees it', async () => {
+    // A server that accepts connections and never answers, and a client set up as in production
+    // (it queues commands and keeps retrying). Before the fix each hold waited seconds for it.
+    // It reads and drops what it receives (a paused socket would never see the client hang up),
+    // and its sockets are destroyed at the end so the server can close.
+    const sockets = new Set<Socket>();
+    const silent: Server = createServer((socket) => {
+      sockets.add(socket);
+      socket.resume();
+    });
+    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', resolve));
+    const { port } = silent.address() as AddressInfo;
+    const goneRedis = createRedis(`redis://127.0.0.1:${port}`, logger);
+    try {
+      const strategy = createRedisStrategy(goneRedis, logger);
+      const bookings = createBookingService(pool, config, strategy);
+      const { showId, seatIds } = await createShowFixture(pool, 1);
+      const users = await createUsers(pool, 10);
+
+      const started = Date.now();
+      const results = await Promise.allSettled(
+        users.map((userId) => bookings.hold(userId, { showId, seatIds })),
+      );
+
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(strategy.stats.redisErrors).toBe(10);
+    } finally {
+      goneRedis.disconnect();
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => silent.close(resolve));
+    }
+    // Without the fix the holds hang on the silent server; fail in 10 s, not the default 30.
+  }, 10_000);
 });

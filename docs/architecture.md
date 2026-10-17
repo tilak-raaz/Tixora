@@ -133,6 +133,17 @@ Every replica and worker serves its own `/metrics` (request latency by route, ho
 seat streams, pool use, jobs, backlog), reachable only inside the stack; `make stack-metrics`
 puts them side by side ([ADR 0015](adr/0015-metrics-per-process.md)).
 
+## When things fail
+
+What users see, as measured by the failure drills ([m7-drills.md](benchmarks/m7-drills.md)):
+
+| Failure                              | Users see                                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An API replica crashes or is stopped | Nothing: nginx retries reads on another replica; live seat maps reconnect elsewhere and reload. A crashed container restarts                                                                              |
+| Redis down                           | Browsing, holds and payments carry on (the cache, limits and seat pre-lock fail open; sessions come from Postgres). Sign-in is refused until Redis is back. Live updates pause, then every viewer resyncs |
+| Postgres restarts                    | Requests fail for about a second, then the pools reconnect by themselves                                                                                                                                  |
+| A worker dies                        | The other workers carry on; jobs it held go back to the queue when their lock expires (30 s)                                                                                                              |
+
 ## Life of a payment
 
 ```text

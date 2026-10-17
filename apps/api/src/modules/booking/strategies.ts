@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Logger, PoolClient, Redis } from '@bmt/platform';
+import { withTimeout } from '../../lib/timeout';
 
 /**
  * Three ways to take seats, behind one interface, so they can be tested and
@@ -152,9 +153,17 @@ export interface RedisStrategyStats {
 export function createRedisStrategy(
   redis: Redis,
   logger: Logger,
-  options: { lockTtlMs?: number } = {},
+  options: { lockTtlMs?: number; timeoutMs?: number } = {},
 ): SeatHoldStrategy & { stats: RedisStrategyStats } {
   const lockTtlMs = options.lockTtlMs ?? 5_000;
+  // How long a hold waits for Redis before going to Postgres alone. A live client queues commands
+  // while Redis is away and retries them for seconds; the Redis failure drill (ADR 0017) saw holds
+  // time out that way, although Postgres could have answered at once.
+  const timeoutMs = options.timeoutMs ?? 200;
+  const skip = () => {
+    stats.redisErrors += 1;
+    return { ok: true as const, release: async () => undefined };
+  };
   const stats: RedisStrategyStats = { rejectedByRedis: 0, redisErrors: 0 };
 
   return {
@@ -167,13 +176,20 @@ export function createRedisStrategy(
       const keys = seatIds.map((id) => `bmt:seat-lock:{${showId}}:${id}`);
       const token = randomUUID();
 
+      // Not connected (down, or reconnecting): do not even queue the command.
+      if (redis.status !== 'ready') return skip();
       let firstTaken: number;
       try {
-        firstTaken = Number(await redis.eval(ACQUIRE, keys.length, ...keys, token, lockTtlMs));
+        firstTaken = Number(
+          await withTimeout(
+            redis.eval(ACQUIRE, keys.length, ...keys, token, lockTtlMs),
+            timeoutMs,
+            'seat pre-lock',
+          ),
+        );
       } catch (err) {
-        stats.redisErrors += 1;
         logger.warn({ err }, 'seat pre-lock unavailable; holding through Postgres alone');
-        return { ok: true, release: async () => undefined };
+        return skip();
       }
 
       if (firstTaken !== 0) {
@@ -182,8 +198,13 @@ export function createRedisStrategy(
       }
       return {
         ok: true,
+        // Bounded too: if Redis has gone, the lock expires by itself after lockTtlMs.
         release: async () => {
-          await redis.eval(RELEASE, keys.length, ...keys, token).catch(() => undefined);
+          await withTimeout(
+            redis.eval(RELEASE, keys.length, ...keys, token),
+            timeoutMs,
+            'seat pre-lock release',
+          ).catch(() => undefined);
         },
       };
     },

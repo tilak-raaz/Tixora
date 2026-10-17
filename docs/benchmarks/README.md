@@ -4,10 +4,11 @@ Each file here is the output of a benchmark script, committed with the change it
 Numbers come from a laptop with everything in Docker: use them to compare options with each
 other, not as capacity figures.
 
-| File                                           | Script                                | Run with      |
-| ---------------------------------------------- | ------------------------------------- | ------------- |
-| [m2-hold-strategies.md](m2-hold-strategies.md) | `apps/api/src/scripts/bench-holds.ts` | `make bench`  |
-| [m7-load.md](m7-load.md)                       | `infra/load/` (k6, Node.js)           | `make load-*` |
+| File                                           | Script                                | Run with       |
+| ---------------------------------------------- | ------------------------------------- | -------------- |
+| [m2-hold-strategies.md](m2-hold-strategies.md) | `apps/api/src/scripts/bench-holds.ts` | `make bench`   |
+| [m7-load.md](m7-load.md)                       | `infra/load/` (k6, Node.js)           | `make load-*`  |
+| [m7-drills.md](m7-drills.md)                   | `infra/drills/`                       | `make drill-*` |
 
 `make bench` needs `make up` first. It creates a throwaway database, runs every scenario, checks
 the booking invariants after each run (a strategy that is fast but wrong fails the benchmark),
