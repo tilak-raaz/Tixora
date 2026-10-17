@@ -3,14 +3,15 @@ import { expect, type Page } from '@playwright/test';
 import pg from 'pg';
 import { DATABASE_URL } from './env';
 
-/** Signs a new user up through the form and waits for the header to show them. */
+/** Signs a new user up through the form and waits for the header to show their avatar. */
 export async function signUp(page: Page, next = '/'): Promise<void> {
   await page.goto(`/signup?next=${encodeURIComponent(next)}`);
   await page.getByLabel('Name').fill('E2E Buyer');
   await page.getByLabel('Email').fill(`e2e-${randomUUID()}@example.test`);
   await page.getByLabel('Password').fill(`pw-${randomUUID()}`);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  // exact: a substring match would find "Create account" on this page and return before sign-up ends.
+  await expect(page.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
 }
 
 /**

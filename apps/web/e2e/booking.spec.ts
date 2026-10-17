@@ -99,3 +99,16 @@ test('a hold that runs out says so and frees the seats', async ({ page }) => {
   await expect(page).toHaveURL(showPath);
   await expect(seat(page, label!)).toBeEnabled();
 });
+
+test('the account menu shows who is signed in and signs out', async ({ page }) => {
+  await signUp(page);
+  await page.getByRole('button', { name: 'Account', exact: true }).click();
+
+  const menu = page.getByRole('dialog', { name: 'Account', exact: true });
+  await expect(menu.getByText('E2E Buyer')).toBeVisible();
+  await expect(menu.getByRole('link', { name: /My bookings/ })).toBeVisible();
+
+  await menu.getByRole('button', { name: 'Sign out' }).click();
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
+});

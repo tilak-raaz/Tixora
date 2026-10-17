@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
+import { posterColour } from '@/lib/poster';
 import { SITE_NAME } from '@/lib/site';
 import { CityPicker } from './city-picker';
 import { Container } from './container';
 import { LogoMark } from './logo-mark';
 import { Button, ButtonLink } from './ui/button';
+import { Drawer } from './ui/drawer';
 import { Skeleton } from './ui/skeleton';
 import { useToast } from './ui/toast';
 
@@ -43,12 +45,13 @@ export function SiteHeader({ cities, rememberedCity }: SiteHeaderProps) {
 
 function Account() {
   const { data: session, isPending } = authClient.useSession();
+  const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
 
-  if (isPending) return <Skeleton className="h-9 w-20" />;
+  if (isPending) return <Skeleton className="size-9 rounded-full" />;
 
   if (!session) {
     if (pathname === '/login' || pathname === '/signup') return null;
@@ -67,29 +70,95 @@ function Account() {
       toast({ title: 'Could not sign out', description: 'Try again.', tone: 'error' });
       return;
     }
+    setOpen(false);
     router.refresh();
   }
 
-  const name = session.user.name || session.user.email;
+  const { name, email } = session.user;
+  const display = name || email;
+  // The same colour for the same person on every visit, from the poster palette.
+  const colour = posterColour(email);
+
   return (
-    <div className="flex items-center gap-2">
-      {/* A wrapper, because the link's own inline-flex would override `hidden`. */}
-      <span className="hidden lg:block">
-        <ButtonLink href="/bookings" variant="ghost" size="sm">
-          My bookings
-        </ButtonLink>
-      </span>
-      <Link
-        href="/bookings"
-        aria-label="My bookings"
-        className="flex size-9 items-center justify-center rounded-md bg-ink font-display text-lg text-white"
+    <>
+      <button
+        type="button"
+        aria-label="Account"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className="flex size-9 items-center justify-center rounded-full font-display text-lg text-white ring-offset-2 transition-shadow hover:ring-2 hover:ring-ink/20"
+        style={{ backgroundColor: colour }}
       >
-        {name.charAt(0).toUpperCase()}
-      </Link>
-      <span className="hidden max-w-36 truncate text-sm font-semibold md:block">{name}</span>
-      <Button variant="ghost" size="sm" onClick={signOut} loading={signingOut}>
-        Sign out
-      </Button>
-    </div>
+        {display.charAt(0).toUpperCase()}
+      </button>
+
+      <Drawer open={open} onClose={() => setOpen(false)} label="Account">
+        <div className="flex h-full flex-col">
+          <div className="flex justify-end p-3">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="rounded-md p-2 text-muted hover:bg-surface hover:text-ink"
+            >
+              <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
+                <path
+                  d="M5 5l10 10M15 5L5 15"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div className="px-6">
+            <span
+              aria-hidden
+              className="flex size-16 items-center justify-center rounded-full font-display text-3xl text-white"
+              style={{ backgroundColor: colour }}
+            >
+              {display.charAt(0).toUpperCase()}
+            </span>
+            <p className="mt-4 truncate font-display text-3xl leading-tight uppercase">{display}</p>
+            {name && <p className="truncate text-sm text-muted">{email}</p>}
+          </div>
+
+          <nav aria-label="Account" className="mt-6 border-t border-dashed border-line px-3 pt-3">
+            <Link
+              href="/bookings"
+              onClick={() => setOpen(false)}
+              className="group flex items-center justify-between gap-3 rounded-md px-3 py-2.5 hover:bg-surface"
+            >
+              <span className="flex flex-col">
+                <span className="font-semibold">My bookings</span>
+                <span className="text-sm text-muted">Your tickets, coming up and past</span>
+              </span>
+              <svg
+                viewBox="0 0 20 20"
+                aria-hidden
+                className="size-5 text-muted group-hover:text-ink"
+              >
+                <path
+                  d="M8 5l5 5-5 5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Link>
+          </nav>
+
+          <div className="mt-auto border-t border-line p-6">
+            <Button variant="secondary" className="w-full" onClick={signOut} loading={signingOut}>
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </Drawer>
+    </>
   );
 }

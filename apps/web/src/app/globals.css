@@ -28,7 +28,17 @@
 
   --radius-card: 0.5rem;
 
-  /* The one animation: a seat someone else just took flashes red once. */
+  /*
+   * Animations only answer something: a seat someone else just took flashes red once, and the
+   * account drawer slides in when opened.
+   */
+  --animate-drawer-in: drawer-in 0.2s ease-out;
+  @keyframes drawer-in {
+    from {
+      transform: translateX(100%);
+    }
+  }
+
   --animate-seat-taken: seat-taken 1.2s ease-out forwards;
   @keyframes seat-taken {
     0% {
@@ -81,5 +91,12 @@
 
   html {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* "See what's on" glides to the listing, unless reduced motion is asked for. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 }
