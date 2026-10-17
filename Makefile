@@ -5,7 +5,7 @@ STACK = $(COMPOSE) $(if $(DEMO),-f infra/docker-compose.demo.yml,) --profile ful
 LOAD = $(COMPOSE) --profile load run --rm --no-deps
 
 .DEFAULT_GOAL := help
-.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-scale stack-warm stack-metrics stack-e2e load-browse load-storm load-fanout load-ratelimit test test-unit test-integration e2e lint typecheck format check
+.PHONY: help up down reset logs ps psql redis-cli migrate create-admin seed bench replay-dlq dev-api dev-worker dev-web build-web stack stack-seed stack-down stack-logs stack-ps stack-scale stack-warm stack-metrics stack-e2e load-browse load-storm load-fanout load-ratelimit drill-replica drill-redis drill-postgres drill-worker test test-unit test-integration e2e lint typecheck format check
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -104,6 +104,22 @@ load-fanout: ## Load: VIEWERS (300) watch one seat map; time for each hold to re
 
 load-ratelimit: ## Load: one address hammers sign-in across all replicas; exactly 5 may pass a minute
 	$(LOAD) k6 run /load/rate-limit.js
+
+drill-replica: ## Drill: kill an API replica under traffic (MODE=stop for a graceful SIGTERM)
+	$(MAKE) stack-warm
+	infra/drills/run.sh replica $(or $(MODE),kill)
+
+drill-redis: ## Drill: Redis down for 30 s under traffic
+	$(MAKE) stack-warm
+	infra/drills/run.sh redis
+
+drill-postgres: ## Drill: restart Postgres under traffic
+	$(MAKE) stack-warm
+	infra/drills/run.sh postgres
+
+drill-worker: ## Drill: kill a worker while confirmation emails go out (needs make stack DEMO=1)
+	$(MAKE) stack-warm
+	infra/drills/run.sh worker
 
 test: ## Run all tests (integration tests start their own containers)
 	npm test

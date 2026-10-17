@@ -138,3 +138,9 @@ docs              Architecture, ADRs, runbooks, benchmarks, lessons
   One address got exactly 5 sign-in attempts a minute across 3 replicas. A second and third
   replica cut browse p99 from 497 ms to 44 ms, but raised peak throughput only 32% on one 8-core
   laptop ([load tests](docs/benchmarks/m7-load.md), [ADR 0016](docs/adr/0016-load-testing.md)).
+- **Failure drills:** a replica crashed or stopped, Redis down for 30 s, Postgres restarted and a
+  worker killed, each under steady traffic with 60 live seat maps open. Afterwards no reads failed
+  except 7 during the Postgres restart, every hold succeeded, all 20 emails arrived once, and every
+  seat map matched the database. The first run found four bugs the tests had missed, including a
+  worker that a database restart silently killed
+  ([drills](docs/benchmarks/m7-drills.md), [ADR 0017](docs/adr/0017-failure-drills.md)).

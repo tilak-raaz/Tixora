@@ -7,26 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ### Added
 
-- Load tests (ADR 0016), run with k6 in a container on the stack's network: `make load-browse` (visitors browsing, ramping to `VUS`), `make load-storm` (`BUYERS` grab `SEATS` seats at once; exactly `SEATS` may win), `make load-fanout` (`VIEWERS` watch one seat map; time for each hold to reach all of them; a Node.js script, as k6 has no SSE client) and `make load-ratelimit` (one address hammers sign-in across all replicas; exactly 5 may pass). Each simulated visitor has its own address, so per-IP limits stay on; each scenario fails if its rule breaks
-- `make stack-scale N=1`: run a different number of API replicas behind nginx
-
-### Added
-
-- Metrics (ADR 0015): every API replica serves `GET /metrics` and every worker serves it on `METRICS_PORT` (9100, also its health check), in the Prometheus text format with `service` and `instance` labels. Request latency by route pattern and status, hold outcomes (held, rejected early by the Redis pre-lock, seat taken in Postgres, refused, error), open seat streams, the Postgres pool, jobs per queue, queue depth and outbox lag, and Node's own (CPU, memory, event loop lag). nginx does not route them
-- `make stack-metrics` (`ROUTES=1` for the busiest routes): every replica's and worker's numbers side by side, read from inside the containers
-
-### Added
-
 - Full stack in containers (ADR 0014): `make stack` starts nginx at http://localhost:8080 in front of 3 API replicas, 2 workers and the Next.js server, after a one-shot `migrate` job, on the same Postgres and Redis as `make up`. `DEMO=1` adds fake payments; otherwise the containers run as production
 - nginx: `least_conn` across the replicas found through Docker's DNS (so seat streams count and restarted replicas are followed), unbuffered seat streams, a request ID passed to the API, JSON access logs naming the replica, the client address set at the edge and carried through server rendering on an internal port
 - Images: one server image for the API, worker and scripts (production dependencies, run through tsx), and the web app as a Next.js standalone server
 - `make stack-e2e` and a CI job: the Playwright suite through nginx against the built images
 - `make stack-warm` (`infra/scripts/warm-up.sh`): waits until the stack answers at normal speed, not just healthy, before tests and load runs
 - Web: `/healthz` for the container health check
+- Metrics (ADR 0015): every API replica serves `GET /metrics` and every worker serves it on `METRICS_PORT` (9100, also its health check), in the Prometheus text format with `service` and `instance` labels. Request latency by route pattern and status, hold outcomes (held, rejected early by the Redis pre-lock, seat taken in Postgres, refused, error), open seat streams, the Postgres pool, jobs per queue, queue depth and outbox lag, and Node's own (CPU, memory, event loop lag). nginx does not route them
+- `make stack-metrics` (`ROUTES=1` for the busiest routes): every replica's and worker's numbers side by side, read from inside the containers
+- Load tests (ADR 0016), run with k6 in a container on the stack's network: `make load-browse` (visitors browsing, ramping to `VUS`), `make load-storm` (`BUYERS` grab `SEATS` seats at once; exactly `SEATS` may win), `make load-fanout` (`VIEWERS` watch one seat map; time for each hold to reach all of them; a Node.js script, as k6 has no SSE client) and `make load-ratelimit` (one address hammers sign-in across all replicas; exactly 5 may pass). Each simulated visitor has its own address, so per-IP limits stay on; each scenario fails if its rule breaks
+- `make stack-scale N=1`: run a different number of API replicas behind nginx
+- Failure drills (ADR 0017): `make drill-replica` (`MODE=stop` for SIGTERM), `make drill-redis`, `make drill-postgres` and `make drill-worker` break one part of the full stack while a probe plays steady users (reads, a buyer, sign-ins, live seat maps that reconnect like a browser), then put it back. A drill fails if any viewer ends up showing the wrong seat state, or (worker drill) any confirmation email is lost
 
 ### Changed
 
 - `make down` and `make reset` also stop the full stack's containers
+- App containers in the full stack (API, worker, web, nginx) restart when they crash
+
+### Fixed
+
+Found by the failure drills (`docs/benchmarks/m7-drills.md`), each with a regression test:
+
+- A Postgres connection cut while checked out (a database restart mid-transaction) crashed the process with an uncaught exception; every pooled connection now has an error listener, so the work fails and is retried instead
+- With Redis down, every signed-in request failed ("Failed to get session"); sessions are now read from Postgres when Redis errors or takes longer than 250 ms
+- With Redis down, holds waited seconds for the seat pre-lock; it is now skipped when Redis is not connected and limited to 200 ms otherwise
+- A replica shutting down kept taking new live seat streams over nginx's kept-alive connections and ended each at once, so viewers reconnected over and over and the shutdown timed out; a draining replica now answers `Connection: close` and refuses new streams with 503, which nginx retries on another replica
 
 ## [0.7.0] - 2026-10-17
 

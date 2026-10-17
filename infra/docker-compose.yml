@@ -3,7 +3,8 @@
 # - Profile `full` (`make stack`): the app in containers too, production-like, behind nginx at
 #   http://localhost:8080: 3 API replicas, 2 workers, the web server, and migrations run once
 #   before any of them start (ADR 0014). It uses the same Postgres and Redis as `make up`.
-# - Profile `load` (`make load-*`): k6 and a Node script that load the full stack (ADR 0016).
+# - Profile `load` (`make load-*`, `make drill-*`): load generators and the steady traffic for
+#   failure drills, run next to the full stack (ADR 0016, ADR 0017).
 name: bmt
 
 # Settings shared by the API, the worker and the migrate job. The secret has a local-only default;
@@ -86,6 +87,9 @@ services:
     pull_policy: never
     command: ['node', '--import', 'tsx', 'apps/api/src/server.ts']
     init: true
+    # A process that crashes comes back by itself, as on any real platform. Without this a crashed
+    # worker stayed down unnoticed (the Postgres failure drill, docs/lessons.md).
+    restart: unless-stopped
     environment:
       <<: *server-env
       PORT: 4000
@@ -123,6 +127,9 @@ services:
     pull_policy: never
     command: ['node', '--import', 'tsx', 'apps/worker/src/main.ts']
     init: true
+    # A process that crashes comes back by itself, as on any real platform. Without this a crashed
+    # worker stayed down unnoticed (the Postgres failure drill, docs/lessons.md).
+    restart: unless-stopped
     environment:
       <<: *server-env
       MAILER: smtp
@@ -160,6 +167,7 @@ services:
         API_URL: http://nginx:8081
     image: bmt-web:local
     init: true
+    restart: unless-stopped
     environment:
       # Server rendering calls the API through nginx's internal port, so it is spread across the
       # replicas too and the visitor's address survives the extra hop.
@@ -180,6 +188,7 @@ services:
   nginx:
     profiles: [full]
     image: nginx:1.28-alpine
+    restart: unless-stopped
     ports:
       - '8080:8080'
     volumes:
@@ -215,6 +224,18 @@ services:
       - ./load:/load:ro
     environment:
       BASE_URL: http://nginx:8081
+
+  # Steady traffic for the failure drills (make drill-*, ADR 0017): readers, a buyer, sign-ins and
+  # live seat maps, or paid bookings for the worker drill.
+  drill:
+    profiles: [load]
+    image: node:24-bookworm-slim
+    command: ['node', '/drills/probe.mjs']
+    volumes:
+      - ./drills:/drills:ro
+    environment:
+      BASE_URL: http://nginx:8081
+      MAILPIT_URL: http://mailpit:8025
 
 volumes:
   pg_data:
