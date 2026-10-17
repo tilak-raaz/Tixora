@@ -15,10 +15,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 - Release pipeline (ADR 0019): pushing a `v*` tag builds the server and web images for amd64, pushes them to GHCR, deploys them over SSH and checks the live site over HTTPS (web page, an API route, the HTTP redirect)
 - `tixora.sh ci-deploy`: what the CI deploy key is forced to run; it deploys only an exact release tag and refuses anything else
 - `make deploy-check` also checks the server helper parses
+- `tixora.sh admin`: creates or promotes the admin account on the server, asking for the password at a prompt
+- Runbook `docs/runbooks/deploy-aws.md`: from an empty AWS account to the live site (EC2, DNS at Hostinger, Resend, Razorpay test mode, the CI deploy key), a release-candidate first run, day-to-day releases and rollbacks, optional disk snapshots, troubleshooting and teardown
 
 ### Changed
 
 - `make seed` tops up: on an existing database it adds the coming week's shows instead of stopping, so the deployed stack runs it daily and never runs out of shows
+- `tixora.sh deploy` records the running release in `.env` (so later commands use its images, not `:latest`) and, like `ci-deploy`, accepts only a release tag
 - nginx config split into shared pieces (`infra/nginx/http.conf`, `routes.conf`, `internal.conf`) used by both the local stack and production
 
 ## [0.8.0] - 2026-10-17
