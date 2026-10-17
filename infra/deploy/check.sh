@@ -5,7 +5,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo '1/2 compose file'
+echo '1/3 server helper parses'
+bash -n deploy/tixora.sh
+
+echo '2/3 compose file'
 # The example's empty secrets would (rightly) fail the required-setting checks; fill them for this.
 env_file=$(mktemp)
 trap 'rm -f "$env_file"' EXIT
@@ -15,7 +18,7 @@ sed -e 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=check/' \
     deploy/.env.example > "$env_file"
 docker compose --env-file "$env_file" -f deploy/docker-compose.yml config --quiet
 
-echo '2/2 nginx config'
+echo '3/3 nginx config'
 docker run --rm -e DOMAIN=tixora.example.test \
   -v "$PWD/nginx:/etc/nginx/bmt:ro" \
   -v "$PWD/deploy/nginx.conf.template:/etc/nginx/bmt-prod/nginx.conf.template:ro" \
