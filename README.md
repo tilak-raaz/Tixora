@@ -4,7 +4,7 @@ A BookMyShow-style movie ticket booking platform, built to learn and prove distr
 patterns under real contention: seat locking, holds that expire, payment idempotency, reliable
 async processing and distributed rate limiting.
 
-> **Status: M6 done (the web app with live seat maps, v0.7.0); M7 next (three replicas behind nginx, load tests, failure drills).** Only what is listed under "What works today" is built. Everything
+> **Status: M7 done (three replicas behind nginx, measured under load and failure, v0.8.0); M8 next (deployment).** Only what is listed under "What works today" is built. Everything
 > else is on the [roadmap](#roadmap) and appears here only once it has a test or a benchmark
 > behind it.
 
@@ -39,6 +39,12 @@ async processing and distributed rate limiting.
   turn taken within a second, on any replica, over Server-Sent Events fed by Redis pub/sub), hold
   them with a 5-minute countdown, pay (Razorpay, or a fake mode for development), and get the
   ticket; My bookings lists the rest
+- The whole app in containers behind nginx (`make stack`): 3 API replicas balanced by least
+  connections, 2 workers, migrations run once before any replica starts, crashed containers
+  restart. Each replica and worker reports its own metrics (`make stack-metrics`)
+- Load tests (`make load-*`, k6) and failure drills (`make drill-*`) against that stack, each of
+  which fails if a rule breaks: one owner per seat, one rate limit across replicas, every live
+  update delivered, no seat map left wrong after a replica, Redis or Postgres goes down
 - Liveness (`GET /healthz`) and readiness (`GET /readyz`, checks Postgres and Redis)
 - SQL migrations with checksums, safe to run from several processes at once
 - Unit tests, integration tests against real Postgres and Redis containers, and Playwright browser
@@ -90,7 +96,7 @@ packages/payments Razorpay client, a fake for tests, signature checks
 packages/platform Server-side building blocks: env, logger, Postgres, Redis, migrations
 packages/shared   Types and constants shared with the frontend
 db/migrations     Forward-only SQL migrations (NNNN_name.sql)
-infra             Docker Compose, Dockerfiles, nginx (k6 arrives later in M7)
+infra             Docker Compose, Dockerfiles, nginx, load tests (k6), failure drills
 docs              Architecture, ADRs, runbooks, benchmarks, lessons
 ```
 

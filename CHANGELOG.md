@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions: [Sem
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-17
+
+M7: the app as a production-like stack of containers behind nginx, measured under load and broken on purpose.
+
 ### Added
 
 - Full stack in containers (ADR 0014): `make stack` starts nginx at http://localhost:8080 in front of 3 API replicas, 2 workers and the Next.js server, after a one-shot `migrate` job, on the same Postgres and Redis as `make up`. `DEMO=1` adds fake payments; otherwise the containers run as production
@@ -190,7 +194,8 @@ M0: foundations.
 - GitHub Actions CI, PR and issue templates, Conventional Commits via commitlint and husky
 - Docs: architecture overview, ADRs 0001 to 0003, local setup runbook
 
-[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/tilak-raaz/Tixora/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/tilak-raaz/Tixora/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/tilak-raaz/Tixora/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/tilak-raaz/Tixora/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/tilak-raaz/Tixora/compare/v0.4.0...v0.5.0
