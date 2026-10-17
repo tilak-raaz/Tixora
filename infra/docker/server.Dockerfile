@@ -14,7 +14,14 @@ COPY packages/payments/package.json packages/payments/
 COPY packages/platform/package.json packages/platform/
 COPY packages/shared/package.json packages/shared/
 # --ignore-scripts: the root `prepare` script installs git hooks, which a container has no use for.
-RUN npm ci --omit=dev --ignore-scripts --workspace=@bmt/api --workspace=@bmt/worker \
+# tsx compiles with esbuild, whose binary for this platform (@esbuild/linux-*) is an optional
+# package; npm skips it silently if the download fails, so check for it in the same step.
+RUN npm ci --omit=dev --ignore-scripts --fetch-retries=5 --fetch-retry-maxtimeout=120000 \
+     --workspace=@bmt/api --workspace=@bmt/worker \
+  && if ! ls -d node_modules/@esbuild/linux-* >/dev/null 2>&1; then \
+       echo "esbuild for linux/$(uname -m) was not installed (download failed?); build again" >&2; \
+       exit 1; \
+     fi \
   && npm cache clean --force
 
 FROM node:24-bookworm-slim

@@ -6,3 +6,4 @@ export * from './migrate';
 export * from './process';
 export * from './outbox';
 export * from './seat-events';
+export * from './metrics';

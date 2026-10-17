@@ -8,3 +8,4 @@ export * from './mailer';
 export * from './email-content';
 export * from './ticket';
 export * from './dlq';
+export * from './metrics';

@@ -11,6 +11,7 @@ import {
 } from '@bmt/platform';
 import { createApp } from './app';
 import { createCache } from './lib/cache';
+import { createApiMetrics } from './lib/metrics';
 import { DEFAULT_RATE_LIMITS } from './lib/rate-limit';
 import { authConfigFrom, bookingConfigFrom, loadConfig, razorpayConfigFrom } from './config';
 import { createAuth } from './modules/auth/auth';
@@ -50,6 +51,9 @@ else if (!razorpay)
 const seatEvents = createSeatEventPublisher({ pool, redis, logger });
 const seatEventHub = createSeatEventHub({ pool, redis, logger });
 
+// Each replica's own numbers at GET /metrics (ADR 0015).
+const metrics = createApiMetrics({ pool, seatStreams: () => seatEventHub.stats() });
+
 const holdExpiryQueue = createHoldExpiryQueue(config.REDIS_URL);
 holdExpiryQueue.on('error', (err) => logger.error({ err }, 'hold expiry queue error'));
 
@@ -71,6 +75,7 @@ const app = createApp({
       : undefined,
   seatEvents,
   seatEventHub,
+  metrics,
 });
 
 const server = app.listen(config.PORT, (err?: Error) => {

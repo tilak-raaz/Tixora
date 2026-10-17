@@ -4,6 +4,7 @@ import type { Logger, Pool, Redis, SeatEventPublisher } from '@bmt/platform';
 import { toNodeHandler } from 'better-auth/node';
 import express, { Router, type Express } from 'express';
 import type { Cache } from './lib/cache';
+import type { ApiMetrics } from './lib/metrics';
 import {
   createRateLimiter,
   NO_LIMITS,
@@ -59,6 +60,8 @@ export interface AppDeps {
   seatEventHub?: SeatEventHub;
   /** Live seat maps one address may keep open on this replica (default 6). */
   seatStreamsPerIp?: number;
+  /** Request timings, hold outcomes and GET /metrics (ADR 0015); without it, no metrics. */
+  metrics?: ApiMetrics;
 }
 
 /**
@@ -73,6 +76,7 @@ export function createApp(deps: AppDeps): Express {
   app.set('trust proxy', 1);
 
   app.use(requestLogger(deps.logger));
+  if (deps.metrics) app.use(deps.metrics.http);
 
   const limits = deps.rateLimits
     ? routeLimits(
@@ -97,8 +101,10 @@ export function createApp(deps: AppDeps): Express {
 
   app.use(express.json({ limit: '100kb' }));
 
-  // Ops endpoints live at the root, outside the versioned API.
+  // Ops endpoints live at the root, outside the versioned API. nginx forwards only /api and
+  // /webhooks to the replicas, so /metrics is never reachable from outside the stack.
   app.use(healthRouter(deps));
+  if (deps.metrics) app.get('/metrics', deps.metrics.handler);
 
   const v1 = Router();
   v1.use(authRouter(deps));

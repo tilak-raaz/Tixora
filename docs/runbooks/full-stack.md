@@ -44,6 +44,28 @@ docker compose -f infra/docker-compose.yml --profile full logs nginx | grep '/ap
 The `upstream` field cycles through three addresses. An API log line's `hostname` is the
 container ID shown by `make stack-ps`.
 
+## Metrics
+
+Each API replica serves `/metrics` and each worker serves it on port 9100, in the Prometheus text
+format ([ADR 0015](../adr/0015-metrics-per-process.md)). nginx does not route them, so
+`make stack-metrics` reads them from inside each container. The output looks like this (numbers
+are illustrative):
+
+```text
+API replicas (since each one started)
+
+replica    requests  2xx  4xx  429s  5xx  p50    p95    holds ok/early/taken  streams  ...
+bmt-api-1  412       398  10   4     0    6 ms   38 ms  12/30/5               3
+bmt-api-2  409       ...
+```
+
+`make stack-metrics ROUTES=1` adds each replica's busiest routes. Numbers are totals since each
+process started; a restarted replica starts again from zero. To see one replica's raw output:
+
+```bash
+docker exec bmt-api-1 node -e "fetch('http://127.0.0.1:4000/metrics').then(r => r.text()).then(console.log)"
+```
+
 ## Browser tests through nginx
 
 ```bash
