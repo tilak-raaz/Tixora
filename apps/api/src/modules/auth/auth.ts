@@ -1,7 +1,7 @@
-import { redisStorage } from '@better-auth/redis-storage';
 import type { Logger, Pool, Redis } from '@bmt/platform';
 import { betterAuth } from 'better-auth';
 import { admin } from 'better-auth/plugins';
+import { createSessionStore } from './session-store';
 
 export interface AuthConfig {
   /** Signs cookies and tokens. At least 32 random characters. */
@@ -50,8 +50,9 @@ export function createAuth({ pool, redis, logger, config }: AuthDeps) {
 
     database: pool,
     // Sessions and verification tokens are read from Redis first, so every API
-    // replica shares one session store without a Postgres query per request.
-    secondaryStorage: redisStorage({ client: redis, keyPrefix: 'bmt:auth:' }),
+    // replica shares one session store without a Postgres query per request. While
+    // Redis is down, sessions are read from Postgres instead (session-store.ts).
+    secondaryStorage: createSessionStore({ client: redis, keyPrefix: 'bmt:auth:', logger }),
 
     emailAndPassword: {
       enabled: true,
